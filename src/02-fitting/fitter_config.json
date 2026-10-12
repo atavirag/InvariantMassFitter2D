@@ -1,0 +1,47 @@
+{
+  "output_dir": "~/Codigo/Analysis/Double-D/InvariantMassFitter2D/data/data_2025_full",
+  "plots_dir":  "~/Codigo/Analysis/Double-D/InvariantMassFitter2D/plots",
+
+  "eta": 0.7,
+  "pt_range": [1.0, 1000.0],
+  "_pair_pt_bins": [0.0, 2.0, 4.0, 5.0, 6.0, 8.0, 10.0, 14.0, 50.0],
+  "pair_pt_bins": [0.0, 100.0],
+  "mass_bins": {
+    "_min": [1.71, 1.72, 1.73, 1.74, 1.75],
+    "_max": [2.02, 2.03, 2.04, 2.05, 2.06],
+    "min": [1.74],
+    "max": [2.05]
+  },
+
+  "input_dir": "~/Codigo/Analysis/Double-D/InvariantMassFitter2D/data/data_2025_full",
+
+  "periods": [
+    { "name": "period2025", "input_dir": "~/Codigo/Analysis/Double-D/InvariantMassFitter2D/data/data_2025_full/preselect" },
+    { "name": "period2024", "input_dir": "~/Codigo/Analysis/Double-D/InvariantMassFitter2D/data/y_0.7_test/preselect" }
+  ],
+
+  "fit_functions": {
+    "signal":     "gaussian",
+    "background": "exponential",
+    "reflection": "doubleGaussian"
+  },
+
+  "modes": {
+    "basic": { "enabled": true },
+    "efficiency": {
+      "enabled": true,
+      "efficiency_map": {
+        "file": "~/MyMacros/InvariantMassFitter/data/Eff_times_Acc_Map_weighted_g4.root",
+        "hist": "hEff_new"
+      }
+    },
+    "reflections": {
+      "enabled": false,
+      "refl_over_sgn": 0.1,
+      "efficiency_map": {
+        "file": "~/MyMacros/InvariantMassFitter/data/Eff_times_Acc_Map_weighted_g4.root",
+        "hist": "hEfficiencyMap"
+      }
+    }
+  }
+}

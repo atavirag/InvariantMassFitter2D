@@ -1,0 +1,14 @@
+numpy>=1.21.0
+matplotlib>=3.5.0
+seaborn>=0.11.0
+uproot>=4.3.0
+awkward>=2.0.0
+scipy>=1.7.0
+pandas>=1.3.0
+
+# Optional but recommended for better plots
+plotly>=5.0.0
+scienceplots>=2.0.0
+
+# For PyROOT integration (if you have ROOT installed)
+# ROOT is typically installed separately, not via pip

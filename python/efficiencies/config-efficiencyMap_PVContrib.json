@@ -1,0 +1,24 @@
+{
+    "verbose": false,
+    "debug": false,
+
+    "files": {
+        "filenameGen": "~/Codigo/Analysis/Double-D/InvariantMassFitter2D/data/AnalysisResults/AnalysisResults_MC_g4.root",
+        "filenameReco": "~/Codigo/Analysis/Double-D/InvariantMassFitter2D/data/AnalysisResults/AnalysisResults_MC_g4.root",
+        "filenameData": "~/Codigo/Analysis/Double-D/InvariantMassFitter2D/data/AnalysisResults/AnalysisResults_data_2025.root"
+    },
+
+    "histos": {
+        "hNameReco": "hPtVsYVsNContribMcRec",
+        "hNameGen": "hPtVsYVsNContribMcGen",
+        "hNameRecoPrompt": "hPtVsYVsNContribMcRecPrompt",
+        "hNameGenPrompt": "hPtVsYVsNContribMcGenPrompt",
+        "hNameRecoNonPrompt": "hPtVsYVsNContribMcRecNonPrompt",
+        "hNameGenNonPrompt": "hPtVsYVsNContribMcGenNonPrompt",
+        "hNameData": "hPVContrib"
+    },
+
+    "isLog_eff": false,
+    "outputDir": "~/Codigo/Analysis/Double-D/InvariantMassFitter2D/data/efficiencies/",
+    "outputFile": "Eff_times_Acc_Map_weighted_g4.root"
+}
