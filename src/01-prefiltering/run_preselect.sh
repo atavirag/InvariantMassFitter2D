@@ -6,8 +6,9 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 SRC_DIR="$SCRIPT_DIR"
-BUILD_DIR="$SCRIPT_DIR/../../build"
+BUILD_DIR="$(realpath ../../build)"
 
+# --- Prepare build directory ---
 mkdir -p "$BUILD_DIR"
 rm -f "$BUILD_DIR"/*_cxx.* "$BUILD_DIR"/*_rdict.pcm
 

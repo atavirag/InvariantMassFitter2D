@@ -47,7 +47,8 @@ string binLabel(double mass_min, double mass_max, double eta, double pt_min, dou
          + "_pairPt_" + fmtPt(pt_min) + "_" + fmtPt(pt_max);
 }
 
-void runOneBin(const json& cfg, double mass_min, double mass_max,
+// Returns false if the bin could not be processed (missing input, missing efficiency map, ...)
+bool runOneBin(const json& cfg, double mass_min, double mass_max,
                double pt_min, double pt_max, const string& mode) {
 
     double eta        = cfg["eta"];
@@ -61,6 +62,10 @@ void runOneBin(const json& cfg, double mass_min, double mass_max,
     string ls_file = input_dir + "/LS_pairs_" + label + ".root";
 
     InvariantMassFitter fitter(os_file, ls_file);
+    if (!fitter.isValid()) {
+        cerr << "  >> SKIPPING " << label << " [" << mode << "]: could not open input files/trees" << endl;
+        return false;
+    }
 
     fitter.setMassRange(mass_min, mass_max, mass_min, mass_max);
     fitter.setPtRange(cfg["pt_range"][0], cfg["pt_range"][1]);
@@ -80,13 +85,19 @@ void runOneBin(const json& cfg, double mass_min, double mass_max,
         mode_tag = "";
     } else if (mode == "efficiency") {
         mode_tag = "corrected";
-        fitter.loadEfficiencyMap(cfg["modes"]["efficiency"]["efficiency_map"]["file"],
-                                 cfg["modes"]["efficiency"]["efficiency_map"]["hist"]);
+        if (!fitter.loadEfficiencyMap(cfg["modes"]["efficiency"]["efficiency_map"]["file"],
+                                      cfg["modes"]["efficiency"]["efficiency_map"]["hist"])) {
+            cerr << "  >> SKIPPING " << label << " [efficiency]: efficiency map not loaded" << endl;
+            return false;
+        }
     } else if (mode == "reflections") {
         mode_tag = "refl";
         fitter.setReflOverSgn(cfg["modes"]["reflections"]["refl_over_sgn"]);
-        fitter.loadEfficiencyMap(cfg["modes"]["reflections"]["efficiency_map"]["file"],
-                                 cfg["modes"]["reflections"]["efficiency_map"]["hist"]);
+        if (!fitter.loadEfficiencyMap(cfg["modes"]["reflections"]["efficiency_map"]["file"],
+                                      cfg["modes"]["reflections"]["efficiency_map"]["hist"])) {
+            cerr << "  >> SKIPPING " << label << " [reflections]: efficiency map not loaded" << endl;
+            return false;
+        }
     }
 
     string suffix = mode_tag.empty() ? "" : "_" + mode_tag;
@@ -106,6 +117,7 @@ void runOneBin(const json& cfg, double mass_min, double mass_max,
     fitter.printFitResults();
     fitter.plotFit(plot_fit, useRefl);
     fitter.saveResultsToFile(useRefl);
+    return true;
 }
 
 int runFitter(int argc, char** argv) {
@@ -128,9 +140,12 @@ int runFitter(int argc, char** argv) {
     vector<double> mass_mins = cfg["mass_bins"]["min"].get<vector<double>>();
     vector<double> mass_maxs = cfg["mass_bins"]["max"].get<vector<double>>();
 
+    int nFailed = 0;
+
     // Loop over all combinations
     for (double mass_min : mass_mins) {
         for (double mass_max : mass_maxs) {
+            if (mass_min >= mass_max) continue; // meaningless window
             for (size_t i = 0; i + 1 < pt_bins.size(); i++) {
                 double pt_min = pt_bins[i];
                 double pt_max = pt_bins[i + 1];
@@ -138,22 +153,20 @@ int runFitter(int argc, char** argv) {
                 cout << "\n>> mass [" << mass_min << ", " << mass_max << "]"
                      << "  pairPt [" << pt_min << ", " << pt_max << "]" << endl;
 
-                if (cfg["modes"]["basic"]["enabled"]) {
-                    cout << "   [basic]" << endl;
-                    runOneBin(cfg, mass_min, mass_max, pt_min, pt_max, "basic");
-                }
-                if (cfg["modes"]["efficiency"]["enabled"]) {
-                    cout << "   [efficiency]" << endl;
-                    runOneBin(cfg, mass_min, mass_max, pt_min, pt_max, "efficiency");
-                }
-                if (cfg["modes"]["reflections"]["enabled"]) {
-                    cout << "   [reflections]" << endl;
-                    runOneBin(cfg, mass_min, mass_max, pt_min, pt_max, "reflections");
+                for (const char* mode : {"basic", "efficiency", "reflections"}) {
+                    if (cfg["modes"][mode]["enabled"]) {
+                        cout << "   [" << mode << "]" << endl;
+                        if (!runOneBin(cfg, mass_min, mass_max, pt_min, pt_max, mode)) nFailed++;
+                    }
                 }
             }
         }
     }
 
-    cout << "\n=== All fits completed successfully! ===" << endl;
-    return 0;
+    if (nFailed == 0) {
+        cout << "\n=== All fits completed successfully! ===" << endl;
+        return 0;
+    }
+    cout << "\n=== Finished with " << nFailed << " skipped/failed bin(s) ===" << endl;
+    return 2;
 }

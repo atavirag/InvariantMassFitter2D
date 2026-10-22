@@ -1,8 +1,8 @@
 {
-  "input_file": "~/Codigo/Analysis/Double-D/InvariantMassFitter2D/data/AO2Ds/AO2D_data_2025.root",
+  "input_file": " ~/analysis/double-D/InvariantMassFitter2D/data/AO2Ds/AO2D_OO_data.root",
   "_input_file": "~/Codigo/Analysis/Double-D/InvariantMassFitter2D/data/AO2Ds/AO2D_OO_data.root",
   "tree_name": "O2d0pair",
-  "output_dir": "~/Codigo/Analysis/Double-D/InvariantMassFitter2D/data/data_2025_full/",
+  "output_dir": " ~/analysis/double-D/InvariantMassFitter2D/data/data_OO_full/",
   "fixed": {
     "pt_min": 1.0,
     "pt_max": 1000.0,

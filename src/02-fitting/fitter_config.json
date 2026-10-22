@@ -1,6 +1,6 @@
 {
-  "output_dir": "~/Codigo/Analysis/Double-D/InvariantMassFitter2D/data/data_2025_full",
-  "plots_dir":  "~/Codigo/Analysis/Double-D/InvariantMassFitter2D/plots",
+  "output_dir": "~/analysis/double-D/InvariantMassFitter2D/data/data_OO_full",
+  "plots_dir":  "~/analysis/double-D/InvariantMassFitter2D/plots",
 
   "eta": 0.7,
   "pt_range": [1.0, 1000.0],
@@ -13,7 +13,7 @@
     "max": [2.05]
   },
 
-  "input_dir": "~/Codigo/Analysis/Double-D/InvariantMassFitter2D/data/data_2025_full",
+  "input_dir": "~/analysis/double-D/InvariantMassFitter2D/data/data_OO_full",
 
   "periods": [
     { "name": "period2025", "input_dir": "~/Codigo/Analysis/Double-D/InvariantMassFitter2D/data/data_2025_full/preselect" },
@@ -31,15 +31,15 @@
     "efficiency": {
       "enabled": true,
       "efficiency_map": {
-        "file": "~/MyMacros/InvariantMassFitter/data/Eff_times_Acc_Map_weighted_g4.root",
-        "hist": "hEff_new"
+        "file": "~/analysis/double-D/InvariantMassFitter2D/data/efficiencies/Eff_times_Acc_Map_weighted.root",
+        "hist": "hEfficiencyMap"
       }
     },
     "reflections": {
       "enabled": false,
       "refl_over_sgn": 0.1,
       "efficiency_map": {
-        "file": "~/MyMacros/InvariantMassFitter/data/Eff_times_Acc_Map_weighted_g4.root",
+        "file": "~/analysis/double-D/InvariantMassFitter2D/data/efficiencies/Eff_times_Acc_Map_weighted.root",
         "hist": "hEfficiencyMap"
       }
     }
