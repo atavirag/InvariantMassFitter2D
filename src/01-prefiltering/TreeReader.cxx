@@ -47,9 +47,6 @@ std::vector<CandidatePair> TreeReader::getAllEntries() {
 
 void TreeReader::countPairEntries() {
     int nDD = 0, nDbarDbar = 0, nDDbar = 0, nDbarD = 0, nDDbarAll = 0;
-    UChar_t typePair;
-    _tree->SetBranchAddress("fPairType", &typePair);
-
     for (Long64_t i = 0; i < _tree->GetEntries(); i++) {
         _tree->GetEntry(i);
 

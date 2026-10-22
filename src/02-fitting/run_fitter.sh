@@ -14,7 +14,7 @@ cd "$SRC_DIR" || exit 1
 root -b <<EOF
 gErrorIgnoreLevel = kWarning;
 gSystem->SetBuildDir("$BUILD_DIR", true);
-gSystem->AddIncludePath("-I/Users/atavirag/Codigo/Analysis/Double-D/InvariantMassFitter2D/src/01-prefiltering");
+gSystem->AddIncludePath("-I~/analysis/double-D/InvariantMassFitter2D/src/01-prefiltering");
 .L functions/BifurcatedCB.cxx+
 .L functions/SignalFunctions.cxx+
 .L functions/BackgroundFunctions.cxx+

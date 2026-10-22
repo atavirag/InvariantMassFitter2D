@@ -4,6 +4,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 #include "TFile.h"
 #include "TTree.h"
 #include "TCanvas.h"
@@ -11,6 +12,7 @@
 #include "RooDataSet.h"
 #include "RooWorkspace.h"
 #include "RooAbsPdf.h"
+#include "RooAbsReal.h"
 #include "TString.h"
 #include "RooPlot.h"
 #include "RooFitResult.h"
@@ -22,17 +24,20 @@ class InvariantMassFitter {
 public:
     InvariantMassFitter(const std::string& osFilename, const std::string& lsFilename);
     ~InvariantMassFitter();
-    
+
+    // True if both input files and both trees were opened correctly
+    bool isValid() const { return _valid; }
+
     // Configuration methods
     void setMassRange(double m1Min, double m1Max, double m2Min, double m2Max);
     void setPtRange(double ptMin, double ptMax);
     void setReflOverSgn(float const& relfOverSgn);
     void setFittingFunctions(TString const &sgnFunc, TString const &bkgFunc, TString const &reflFunc);
     void setOutputFile(const std::string& filename);
-    
-    // Efficiency correction
-    void loadEfficiencyMap(const std::string& filename, const std::string& histName);
-    
+
+    // Efficiency correction (returns false if the map could not be loaded)
+    bool loadEfficiencyMap(const std::string& filename, const std::string& histName);
+
     // Core functionality
     void createVariables();
     void loadData();
@@ -43,7 +48,7 @@ public:
     void performPrefit(const std::string& dataType = "both", bool useReflections = false);
     void setPrefitParameters(bool const doReflections = false);
     void plotPrefitResults(const std::string& outputPrefix);
-    
+
     // Output and visualization
     void plotFit(const std::string& outputPrefix, bool const doReflections = false);
     void saveWorkspace(const std::string& filename);
@@ -52,22 +57,32 @@ public:
 
     // Chi2 computation (works for weighted and unweighted data)
     double computeChi2(RooPlot* frame, RooDataSet* data, int nFitParams);
-    
+
 private:
     // Helper methods
     RooAbsPdf* createSignalPdf(const std::string& name, RooRealVar& mass);
     RooAbsPdf* createBackgroundPdf(const std::string& name, RooRealVar& mass);
     RooAbsPdf* createReflectedPdf(const std::string& name, RooRealVar& mass);
-    double calculateWeights(float const &y, float const &pt);
-    void plotModelOnFrame(RooPlot* frame, RooAbsPdf* pdf, bool const doReflections);
-    RooRealVar *getYieldInRange(RooFitResult *fitResult, RooProdPdf* function, RooFormulaVar* nCands, TString range);
-    
+    // Returns 1/efficiency, or -1 if the candidate cannot be corrected
+    double calculateWeights(float const &pt, float const &y);
+    void plotModelOnFrame(RooPlot* frame, RooAbsPdf* pdf, bool const doReflections,
+                          const std::vector<std::string>& textLines = {}, bool showLegend = true);
+
+    // 3-sigma yields
+    struct YieldEntry { std::string label; double value; double error; bool ok; };
+    bool setSigmaWindow();
+    std::vector<YieldEntry> computeYields3Sigma(const std::string& snapshot, RooFitResult* res, bool doReflections);
+    std::vector<std::string> yieldTextLines(const std::string& label, const std::string& snapshot,
+                                            const std::string& fitResultName, bool doReflections);
+    RooRealVar *getYieldInRange(RooFitResult *fitResult, RooAbsPdf* function, RooAbsReal* nCands, TString range);
+
     // Input files and trees
     std::unique_ptr<TFile> _osFile;
     std::unique_ptr<TFile> _lsFile;
     TTree* _osTree;
     TTree* _lsTree;
-    
+    bool _valid;
+
     // Mass variables
     std::unique_ptr<RooRealVar> _m1;
     std::unique_ptr<RooRealVar> _m2;
@@ -87,24 +102,24 @@ private:
     std::unique_ptr<RooFitResult> _prefitResult_os_m2;
     std::unique_ptr<RooFitResult> _prefitResult_ls_m1;
     std::unique_ptr<RooFitResult> _prefitResult_ls_m2;
-    
-    RooFitResult* performPrefit1D(RooDataSet* data, RooRealVar& mass, 
+
+    RooFitResult* performPrefit1D(RooDataSet* data, RooRealVar& mass,
                                   const std::string& name, bool useReflections);
     void extractPrefitParameters(const std::string& prefitName, const std::string& targetName);
-    
+
     // Datasets
     std::unique_ptr<RooDataSet> _osData;
     std::unique_ptr<RooDataSet> _lsData;
-    
+
     // Workspace
     std::unique_ptr<RooWorkspace> _workspace;
-    
+
     // Efficiency correction
     std::unique_ptr<TH2D> _efficiencyMap;
-    
+
     // Output
     std::string _outputRootFile;
-    
+
     // Function options
     TString _sgnFuncOption;
     TString _bkgFuncOption;
