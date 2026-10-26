@@ -1,6 +1,6 @@
 {
-  "output_dir": "~/analysis/double-D/InvariantMassFitter2D/data/data_OO_full",
-  "plots_dir":  "~/analysis/double-D/InvariantMassFitter2D/plots",
+  "output_dir": "~/analysis/double-D/InvariantMassFitter2D/data/toy_mc_closure_test",
+  "plots_dir":  "~/analysis/double-D/InvariantMassFitter2D/plots/toy_mc_closure_test",
 
   "eta": 0.7,
   "pt_range": [1.0, 1000.0],
@@ -9,11 +9,11 @@
   "mass_bins": {
     "_min": [1.71, 1.72, 1.73, 1.74, 1.75],
     "_max": [2.02, 2.03, 2.04, 2.05, 2.06],
-    "min": [1.74],
+    "min": [1.73],
     "max": [2.05]
   },
 
-  "input_dir": "~/analysis/double-D/InvariantMassFitter2D/data/data_OO_full",
+  "input_dir": "~/analysis/double-D/InvariantMassFitter2D/data/toy_mc_closure_test",
 
   "periods": [
     { "name": "period2025", "input_dir": "~/Codigo/Analysis/Double-D/InvariantMassFitter2D/data/data_2025_full/preselect" },
@@ -29,17 +29,32 @@
   "modes": {
     "basic": { "enabled": true },
     "efficiency": {
-      "enabled": true,
+      "enabled": false,
+      "shape_from_basic": false,
+      "min_efficiency": 0.01,
       "efficiency_map": {
-        "file": "~/analysis/double-D/InvariantMassFitter2D/data/efficiencies/Eff_times_Acc_Map_weighted.root",
+        "file": "~/analysis/double-D/InvariantMassFitter2D/data/efficiencies/Eff_times_Acc_Map_weighted_k3.root",
         "hist": "hEfficiencyMap"
       }
     },
     "reflections": {
       "enabled": false,
-      "refl_over_sgn": 0.1,
+      "refl_over_sgn": 0.15,
+      "shape_from_basic": false,
+      "min_efficiency": 0.01,
       "efficiency_map": {
-        "file": "~/analysis/double-D/InvariantMassFitter2D/data/efficiencies/Eff_times_Acc_Map_weighted.root",
+        "file": "~/analysis/double-D/InvariantMassFitter2D/data/efficiencies/Eff_times_Acc_Map_weighted_k3.root",
+        "hist": "hEfficiencyMap"
+      }
+    },
+    "reflections_raw": {
+      "enabled": false,
+      "refl_over_sgn": 0.15
+    },
+    "efficiency_hybrid": {
+      "enabled": false,
+      "efficiency_map": {
+        "file": "~/analysis/double-D/InvariantMassFitter2D/data/efficiencies/Eff_times_Acc_Map_weighted_k3.root",
         "hist": "hEfficiencyMap"
       }
     }

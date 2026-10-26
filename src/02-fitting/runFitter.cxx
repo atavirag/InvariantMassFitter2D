@@ -69,6 +69,7 @@ bool runOneBin(const json& cfg, double mass_min, double mass_max,
 
     fitter.setMassRange(mass_min, mass_max, mass_min, mass_max);
     fitter.setPtRange(cfg["pt_range"][0], cfg["pt_range"][1]);
+    if (cfg.contains("min_efficiency")) fitter.setMinEfficiency(cfg["min_efficiency"].get<double>());
 
     std::string const sgnFunction = cfg["fit_functions"]["signal"];
     std::string const bkgFunction = cfg["fit_functions"]["background"];
@@ -78,7 +79,8 @@ bool runOneBin(const json& cfg, double mass_min, double mass_max,
                                bkgFunction,
                                reflFunction);
 
-    bool useRefl = (mode == "reflections");
+    // "reflections" = efficiency-corrected + reflections; "reflections_raw" = raw (unweighted) + reflections
+    bool useRefl = (mode == "reflections" || mode == "reflections_raw");
     string mode_tag;
 
     if (mode == "basic") {
@@ -96,6 +98,30 @@ bool runOneBin(const json& cfg, double mass_min, double mass_max,
         if (!fitter.loadEfficiencyMap(cfg["modes"]["reflections"]["efficiency_map"]["file"],
                                       cfg["modes"]["reflections"]["efficiency_map"]["hist"])) {
             cerr << "  >> SKIPPING " << label << " [reflections]: efficiency map not loaded" << endl;
+            return false;
+        }
+    } else if (mode == "efficiency_hybrid") {
+        // Raw (unweighted) fit; the 3-sigma yields are corrected with data-driven mean pair weights
+        mode_tag = "hybrid";
+        if (!fitter.loadEfficiencyMap(cfg["modes"]["efficiency_hybrid"]["efficiency_map"]["file"],
+                                      cfg["modes"]["efficiency_hybrid"]["efficiency_map"]["hist"])) {
+            cerr << "  >> SKIPPING " << label << " [efficiency_hybrid]: efficiency map not loaded" << endl;
+            return false;
+        }
+        fitter.enableHybrid();
+    } else if (mode == "reflections_raw") {
+        // No efficiency map: raw (unweighted) fit with reflections
+        mode_tag = "refl_raw";
+        fitter.setReflOverSgn(cfg["modes"]["reflections_raw"].value("refl_over_sgn", 0.15f));
+    }
+
+    // Optionally fix the signal shape (mean, sigma, ...) to the raw (basic) fit of the same bin.
+    // The background parameters stay free. Needs the basic mode to have run first.
+    if (mode != "basic" && cfg["modes"][mode].value("shape_from_basic", false)) {
+        string basic_file = output_dir + "/fit_results_" + bkgFunction + "_" + label + ".root";
+        if (!fitter.fixSignalShapeFromFile(basic_file)) {
+            cerr << "  >> SKIPPING " << label << " [" << mode << "]: could not read the raw fit shape from "
+                 << basic_file << endl;
             return false;
         }
     }
@@ -153,8 +179,8 @@ int runFitter(int argc, char** argv) {
                 cout << "\n>> mass [" << mass_min << ", " << mass_max << "]"
                      << "  pairPt [" << pt_min << ", " << pt_max << "]" << endl;
 
-                for (const char* mode : {"basic", "efficiency", "reflections"}) {
-                    if (cfg["modes"][mode]["enabled"]) {
+                for (const char* mode : {"basic", "efficiency", "efficiency_hybrid", "reflections", "reflections_raw"}) {
+                    if (cfg["modes"].contains(mode) && cfg["modes"][mode]["enabled"]) {
                         cout << "   [" << mode << "]" << endl;
                         if (!runOneBin(cfg, mass_min, mass_max, pt_min, pt_max, mode)) nFailed++;
                     }

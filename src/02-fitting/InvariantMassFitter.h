@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <map>
 #include "TFile.h"
 #include "TTree.h"
 #include "TCanvas.h"
@@ -22,6 +23,10 @@ class TH2D;
 
 class InvariantMassFitter {
 public:
+    // Public (not private) so that the ROOT/ACLiC dictionary can see it: mean pair weights per class
+    // (order SgnSgn, SgnBkg, BkgSgn, BkgBkg) for the hybrid correction
+    struct HybridWeights { std::vector<double> w; std::vector<double> err; bool ok = false; };
+
     InvariantMassFitter(const std::string& osFilename, const std::string& lsFilename);
     ~InvariantMassFitter();
 
@@ -37,6 +42,20 @@ public:
 
     // Efficiency correction (returns false if the map could not be loaded)
     bool loadEfficiencyMap(const std::string& filename, const std::string& histName);
+
+    // Hybrid mode: the fit is done on the RAW (unweighted) data, and the 3-sigma yields are then
+    // multiplied by per-class mean pair weights <1/(eff1*eff2)> estimated from the data by a
+    // linear fit over mass-sideband/window regions. Needs loadEfficiencyMap(). No reflections.
+    void enableHybrid() { _hybrid = true; }
+
+    // Candidates whose map efficiency is below this value are dropped (default 1e-4).
+    // Raising it removes the huge weights 1/eff that dominate the weighted fit.
+    void setMinEfficiency(double e) { _minEff = e; }
+
+    // Fix the signal shape parameters (mean, sigma, ...) to the values of the raw ("basic") fit
+    // stored in `basicFile` (OS values for the OS fit, LS values for the LS fit).
+    // The background parameters stay free. Returns false if the file/snapshots cannot be read.
+    bool fixSignalShapeFromFile(const std::string& basicFile);
 
     // Core functionality
     void createVariables();
@@ -69,7 +88,14 @@ private:
                           const std::vector<std::string>& textLines = {}, bool showLegend = true);
 
     // 3-sigma yields
-    struct YieldEntry { std::string label; double value; double error; bool ok; };
+    // value/error: reported yield (hybrid-corrected in hybrid mode); rawValue/rawError: from the fit
+    struct YieldEntry { std::string label; double value; double error; bool ok; double rawValue; double rawError; };
+
+    // Hybrid correction: mean pair weights per class (order SgnSgn, SgnBkg, BkgSgn, BkgBkg)
+    bool _hybrid = false;
+    bool weighted() const { return _efficiencyMap != nullptr && !_hybrid; }
+    std::map<std::string, HybridWeights> _hybridW; //! keyed by "os"/"ls" (transient: not for ROOT I/O)
+    bool computeHybridWeights(const std::string& tag);
     bool setSigmaWindow();
     std::vector<YieldEntry> computeYields3Sigma(const std::string& snapshot, RooFitResult* res, bool doReflections);
     std::vector<std::string> yieldTextLines(const std::string& label, const std::string& snapshot,
@@ -116,6 +142,11 @@ private:
 
     // Efficiency correction
     std::unique_ptr<TH2D> _efficiencyMap;
+    double _minEff = 1e-4;
+
+    // Signal shape taken from the raw fit: "os"/"ls" -> parameter name -> value
+    std::map<std::string, std::map<std::string, double>> _fixedShape;
+    void applyFixedShape(const std::string& tag);
 
     // Output
     std::string _outputRootFile;

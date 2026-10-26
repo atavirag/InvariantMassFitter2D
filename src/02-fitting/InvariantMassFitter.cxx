@@ -1,4 +1,6 @@
 // InvariantMassFitter.cxx
+/// TO BE FIXED: weighed fit with the efficiency map
+
 #include "InvariantMassFitter.h"
 #include "RooGaussian.h"
 #include "RooChebychev.h"
@@ -21,6 +23,8 @@
 #include "TCanvas.h"
 #include "TLegend.h"
 #include "TPaveText.h"
+#include "TMatrixD.h"
+#include "TVectorD.h"
 #include <algorithm>
 #include <cmath>
 #include <iostream>
@@ -173,12 +177,74 @@ bool InvariantMassFitter::loadEfficiencyMap(const std::string& filename, const s
     return true;
 }
 
+bool InvariantMassFitter::fixSignalShapeFromFile(const std::string& basicFile) {
+    std::unique_ptr<TFile> f(TFile::Open(basicFile.c_str(), "READ"));
+    if (!f || f->IsZombie()) {
+        std::cerr << "Error: Cannot open raw fit file " << basicFile << std::endl;
+        return false;
+    }
+    RooWorkspace* ws = dynamic_cast<RooWorkspace*>(f->Get("w"));
+    if (!ws) {
+        std::cerr << "Error: No workspace 'w' in " << basicFile << std::endl;
+        return false;
+    }
+
+    // Signal shape parameters, depending on the signal function
+    std::vector<std::string> names;
+    for (const char* idx : {"m1", "m2"}) {
+        const std::string pre = std::string(idx) + "_sig";
+        if (_sgnFuncOption == "gaussian") {
+            names.insert(names.end(), {pre + "_mean", pre + "_sigma"});
+        } else if (_sgnFuncOption == "doubleGaussian") {
+            names.insert(names.end(), {pre + "_mean", pre + "_sigma1", pre + "_sigma2", pre + "_frac"});
+        } else if (_sgnFuncOption == "crystalball") {
+            for (const char* p : {"mu", "sigma", "alphaL", "nL", "alphaR", "nR"})
+                names.push_back(std::string(p) + "_" + pre);
+        }
+    }
+
+    _fixedShape.clear();
+    const std::vector<std::pair<std::string, std::string>> snaps = {{"os", "osParams"}, {"ls", "lsParams"}};
+    for (const auto& s : snaps) {
+        if (!ws->loadSnapshot(s.second.c_str())) {
+            std::cerr << "Warning: snapshot " << s.second << " not found in " << basicFile
+                      << " (" << s.first << " shape stays free)" << std::endl;
+            continue;
+        }
+        for (const std::string& n : names) {
+            RooRealVar* v = ws->var(n.c_str());
+            if (!v) {
+                std::cerr << "Error: parameter " << n << " not found in " << basicFile << std::endl;
+                _fixedShape.clear();
+                return false;
+            }
+            _fixedShape[s.first][n] = v->getVal();
+        }
+    }
+
+    if (_fixedShape.empty()) return false;
+    std::cout << "Signal shape will be fixed to the raw fit in " << basicFile << std::endl;
+    return true;
+}
+
+void InvariantMassFitter::applyFixedShape(const std::string& tag) {
+    auto it = _fixedShape.find(tag);
+    if (it == _fixedShape.end()) return;
+    for (const auto& kv : it->second) {
+        RooRealVar* v = _workspace->var(kv.first.c_str());
+        if (!v) continue;
+        v->setVal(kv.second);
+        v->setConstant(true);
+        std::cout << "  " << kv.first << " fixed to " << kv.second << std::endl;
+    }
+}
+
 // Returns 1/efficiency, or -1 if the candidate cannot be corrected.
 double InvariantMassFitter::calculateWeights(float const &pt, float const &y)
 {
     if (!_efficiencyMap) return 1.0;
 
-    const double epsilon = 1e-4;
+    const double epsilon = _minEff;
 
     // If the map is in |y| (Y axis starts at 0), use |y|
     double yv = (_efficiencyMap->GetYaxis()->GetXmin() >= 0.) ? std::fabs(y) : y;
@@ -276,7 +342,11 @@ void InvariantMassFitter::loadData() {
         createVariables();
     }
 
-    const bool useEfficiency = (_efficiencyMap != nullptr);
+    // useEfficiency: weighted dataset (efficiency mode).
+    // needWeights:   candidates that cannot be corrected are dropped (also in hybrid mode, where the
+    //                dataset stays unweighted but the weights are used afterwards).
+    const bool useEfficiency = weighted();
+    const bool needWeights   = (_efficiencyMap != nullptr);
 
     // Builds one dataset (OS or LS) from a tree
     auto buildDataset = [&](TTree* tree, const char* name, const char* title, bool isOS)
@@ -352,7 +422,7 @@ void InvariantMassFitter::loadData() {
             }
 
             double wCand1 = 1., wCand2 = 1.;
-            if (useEfficiency) {
+            if (needWeights) {
                 wCand1 = calculateWeights(pt1, y1); // 1/efficiency or -1
                 wCand2 = calculateWeights(pt2, y2);
                 if (wCand1 < 0. || wCand2 < 0.) { nSkippedEff++; continue; }
@@ -537,7 +607,7 @@ RooFitResult* InvariantMassFitter::performPrefit1D(RooDataSet* data, RooRealVar&
                               RooArgList(*nSig, *nBkg));
     }
 
-    RooFitResult* result = doFitTo(model, *data, _efficiencyMap != nullptr);
+    RooFitResult* result = doFitTo(model, *data, weighted());
     if (!result) {
         std::cerr << "Error: prefit " << name << " returned no result" << std::endl;
         return nullptr;
@@ -737,7 +807,7 @@ void InvariantMassFitter::fit(const std::string& dataType) {
     if (!_osData && !_lsData) return;
 
     RooAbsPdf* pdf = _workspace->pdf("model");
-    const bool isWeighted = (_efficiencyMap != nullptr);
+    const bool isWeighted = weighted();
 
     // Remember the start values (from the prefit) so that the LS fit does not start from the OS best fit
     {
@@ -749,6 +819,7 @@ void InvariantMassFitter::fit(const std::string& dataType) {
     if ((dataType == "OS" || dataType == "both") && _osData) {
         std::cout << "\n=== Fitting OS data ===" << std::endl;
         _workspace->loadSnapshot("initParams");
+        applyFixedShape("os"); // after the snapshot: loading it also restores the 'constant' flags
         RooFitResult* result = doFitTo(pdf, *_osData, isWeighted);
         if (result) {
             result->Print("v");
@@ -763,6 +834,7 @@ void InvariantMassFitter::fit(const std::string& dataType) {
     if ((dataType == "LS" || dataType == "both") && _lsData) {
         std::cout << "\n=== Fitting LS data ===" << std::endl;
         _workspace->loadSnapshot("initParams");
+        applyFixedShape("ls");
         RooFitResult* result = doFitTo(pdf, *_lsData, isWeighted);
         if (result) {
             result->Print("v");
@@ -791,12 +863,147 @@ bool InvariantMassFitter::setSigmaWindow() {
     return true;
 }
 
+// Hybrid correction. Model: in each of 9 mass regions r (m1, m2 each in {low sideband, +-3 sigma window,
+// high sideband}) the weighted sum of the unweighted data is
+//     W_r = sum_c  n_{c,r} * <w>_c ,
+// where n_{c,r} = (raw fitted yield of class c) * (fraction of its pdf in region r) is known from the raw
+// fit, and <w>_c is the mean pair weight 1/(eff1*eff2) of class c (assumed constant over the mass plane).
+// The four <w>_c are obtained by a weighted linear least-squares fit, Var(W_r) = sum of w^2 in r.
+// Classes: 0=SgnSgn, 1=SgnBkg, 2=BkgSgn, 3=BkgBkg.
+bool InvariantMassFitter::computeHybridWeights(const std::string& tag) {
+    auto cached = _hybridW.find(tag);
+    if (cached != _hybridW.end()) return cached->second.ok;
+
+    HybridWeights hw;
+    auto finish = [&](bool ok) {
+        hw.ok = ok;
+        _hybridW[tag] = hw;
+        return ok;
+    };
+
+    RooDataSet* data = (tag == "os") ? _osData.get() : _lsData.get();
+    if (!data || !_efficiencyMap) return finish(false);
+
+    _workspace->loadSnapshot((tag + "Params").c_str());
+
+    double mean1, mean1Err, sig1, sig1Err, mean2, mean2Err, sig2, sig2Err;
+    if (!getSignalMeanSigma(_workspace.get(), _sgnFuncOption, "m1_sig", mean1, mean1Err, sig1, sig1Err) ||
+        !getSignalMeanSigma(_workspace.get(), _sgnFuncOption, "m2_sig", mean2, mean2Err, sig2, sig2Err)) {
+        std::cerr << "Error: hybrid weights: cannot find signal parameters" << std::endl;
+        return finish(false);
+    }
+
+    RooRealVar* v1 = _workspace->var("m1");
+    RooRealVar* v2 = _workspace->var("m2");
+    if (!v1 || !v2) return finish(false);
+
+    // Region edges: [min, lo) | [lo, hi] | (hi, max]
+    const double e1[4] = {_m1Min, std::max(mean1 - 3 * sig1, _m1Min), std::min(mean1 + 3 * sig1, _m1Max), _m1Max};
+    const double e2[4] = {_m2Min, std::max(mean2 - 3 * sig2, _m2Min), std::min(mean2 + 3 * sig2, _m2Max), _m2Max};
+
+    const char* rn[3]   = {"L", "S", "R"};
+    const char* pdfs[4] = {"pdfSigSig", "pdfSigBkg", "pdfBkgSig", "pdfBkgBkg"};
+    const char* ys[4]   = {"nSgnSgn", "nSgnBkg", "nBkgSgn", "nBkgBkg"};
+
+    // Expected raw counts A[r][c] from the raw fit
+    RooArgSet obs(*v1, *v2);
+    double A[9][4] = {};
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            const int r = 3 * i + j;
+            if (e1[i + 1] <= e1[i] || e2[j + 1] <= e2[j]) continue; // empty region
+            const std::string rname = std::string("hyb_") + rn[i] + rn[j];
+            v1->setRange(rname.c_str(), e1[i], e1[i + 1]);
+            v2->setRange(rname.c_str(), e2[j], e2[j + 1]);
+            for (int c = 0; c < 4; c++) {
+                RooAbsPdf*  f = _workspace->pdf(pdfs[c]);
+                RooAbsReal* n = dynamic_cast<RooAbsReal*>(_workspace->arg(ys[c]));
+                if (!f || !n) {
+                    std::cerr << "Error: hybrid weights: component " << pdfs[c] << " / " << ys[c] << " missing" << std::endl;
+                    return finish(false);
+                }
+                RooAbsReal* ir = f->createIntegral(obs, Range(rname.c_str()));
+                RooAbsReal* it = f->createIntegral(obs);
+                A[r][c] = n->getVal() * ir->getVal() / it->getVal();
+                delete ir;
+                delete it;
+            }
+        }
+    }
+
+    // Weighted sums per region from the (unweighted) data
+    double W[9] = {}, V[9] = {};
+    double sumAll = 0.;
+    long nAll = 0;
+    for (int k = 0; k < data->numEntries(); k++) {
+        const RooArgSet* row = data->get(k);
+        const double a = row->getRealValue("m1");
+        const double b = row->getRealValue("m2");
+        const float pt1 = row->getRealValue("pt1"), pt2 = row->getRealValue("pt2");
+        const float y1 = row->getRealValue("y1"), y2 = row->getRealValue("y2");
+        const double w1 = calculateWeights(pt1, y1);
+        const double w2 = calculateWeights(pt2, y2);
+        if (w1 < 0. || w2 < 0.) continue;
+        const double w = w1 * w2;
+        const int i = (a < e1[1]) ? 0 : (a <= e1[2] ? 1 : 2);
+        const int j = (b < e2[1]) ? 0 : (b <= e2[2] ? 1 : 2);
+        W[3 * i + j] += w;
+        V[3 * i + j] += w * w;
+        sumAll += w;
+        nAll++;
+    }
+
+    // Weighted linear least squares: minimise sum_r (W_r - sum_c A_rc w_c)^2 / V_r
+    TMatrixD M(4, 4);
+    TVectorD b(4);
+    for (int r = 0; r < 9; r++) {
+        if (V[r] <= 0.) continue;
+        for (int c1 = 0; c1 < 4; c1++) {
+            b[c1] += A[r][c1] * W[r] / V[r];
+            for (int c2 = 0; c2 < 4; c2++) M(c1, c2) += A[r][c1] * A[r][c2] / V[r];
+        }
+    }
+    double det = 0.;
+    TMatrixD Minv(M);
+    Minv.Invert(&det);
+    if (!std::isfinite(det) || det == 0.) {
+        std::cerr << "Error: hybrid weights: singular normal matrix" << std::endl;
+        return finish(false);
+    }
+    TVectorD wv = Minv * b;
+
+    const char* names[4] = {"SgnSgn", "SgnBkg", "BkgSgn", "BkgBkg"};
+    std::cout << "\n=== Hybrid mean pair weights (" << tag << ") ===" << std::endl;
+    std::cout << "  overall mean weight: " << (nAll > 0 ? sumAll / nAll : 0.) << std::endl;
+    for (int c = 0; c < 4; c++) {
+        double var = Minv(c, c);
+        double err = var > 0. ? std::sqrt(var) : 0.;
+        hw.w.push_back(wv[c]);
+        hw.err.push_back(err);
+        std::cout << "  <w> " << names[c] << ": " << wv[c] << " +- " << err << std::endl;
+        if (wv[c] <= 0.) std::cerr << "  Warning: non-positive mean weight for " << names[c] << std::endl;
+    }
+    return finish(true);
+}
+
 // Loads `snapshot`, sets the 3-sigma window and returns the yield of every 2D component in it.
 // Returns an empty vector if the window cannot be set.
 auto InvariantMassFitter::computeYields3Sigma(const std::string& snapshot, RooFitResult* res, bool doReflections)
     -> std::vector<YieldEntry> {
     std::vector<YieldEntry> out;
     if (!res) return out;
+
+    // Hybrid mode: per-class mean pair weights (computed once per dataset; loads its own snapshot)
+    const std::string tag = snapshot.substr(0, 2); // "os" or "ls"
+    bool hyb = false;
+    if (_hybrid) {
+        if (doReflections) {
+            std::cerr << "Warning: hybrid correction does not support reflections; yields stay raw" << std::endl;
+        } else {
+            hyb = computeHybridWeights(tag);
+            if (!hyb) std::cerr << "Warning: hybrid weights not available for " << tag << "; yields stay raw" << std::endl;
+        }
+    }
 
     _workspace->loadSnapshot(snapshot.c_str());
     if (!setSigmaWindow()) return out;
@@ -813,15 +1020,25 @@ auto InvariantMassFitter::computeYields3Sigma(const std::string& snapshot, RooFi
         for (size_t p; (p = pdfName.find("Sgn")) != std::string::npos; ) pdfName.replace(p, 3, "Sig");
         for (size_t p; (p = nName.find("Sig"))   != std::string::npos; ) nName.replace(p, 3, "Sgn");
 
-        YieldEntry e{comp, 0., 0., false};
+        YieldEntry e{comp, 0., 0., false, 0., 0.};
         RooAbsPdf*  f = _workspace->pdf(pdfName.c_str());
         RooAbsReal* n = dynamic_cast<RooAbsReal*>(_workspace->arg(nName.c_str()));
         if (f && n) {
             RooRealVar* y = getYieldInRange(res, f, n, "3sigmaRange");
-            e.value = y->getVal();
-            e.error = y->getError();
+            e.value = e.rawValue = y->getVal();
+            e.error = e.rawError = y->getError();
             e.ok = true;
             delete y;
+
+            if (hyb) {
+                static const char* mainComps[4] = {"SgnSgn", "SgnBkg", "BkgSgn", "BkgBkg"};
+                for (int ci = 0; ci < 4; ci++) {
+                    if (comp != mainComps[ci]) continue;
+                    const HybridWeights& hw = _hybridW.at(tag);
+                    e.value = e.rawValue * hw.w[ci];
+                    e.error = std::hypot(e.rawError * hw.w[ci], e.rawValue * hw.err[ci]);
+                }
+            }
         }
         out.push_back(e);
     }
@@ -872,17 +1089,25 @@ void InvariantMassFitter::plotModelOnFrame(RooPlot* frame, RooAbsPdf* pdf, bool 
     }
 
     // Legend naming the components, attached to the frame so it is drawn and saved with it
-    TLegend* leg = new TLegend(0.55, doReflections ? 0.45 : 0.62, 0.89, 0.89);
+    TLegend* leg = new TLegend(0.60, doReflections ? 0.45 : 0.62, 0.89, 0.89);
     leg->SetBorderSize(0);
     leg->SetFillStyle(0);
     leg->SetTextSize(0.035);
 
+    // Check by name first: RooPlot::findObject prints an error for names that do not exist
+    auto hasObject = [&](const char* nm) {
+        for (int i = 0; i < frame->numItems(); ++i) {
+            const char* n = frame->nameOf(i);
+            if (n && std::string(n) == nm) return true;
+        }
+        return false;
+    };
     auto addEntry = [&](const char* objName, const char* text, const char* opt) {
-        if (TObject* o = frame->findObject(objName)) leg->AddEntry(o, text, opt);
+        if (hasObject(objName)) leg->AddEntry(frame->findObject(objName), text, opt);
     };
 
     for (const char* dn : {"data_cand1", "data_os_m1", "data_os_m2", "data_ls_m1", "data_ls_m2"}) {
-        if (frame->findObject(dn)) { addEntry(dn, "Data", "pe"); break; }
+        if (hasObject(dn)) { addEntry(dn, "Data", "pe"); break; }
     }
     addEntry("model_curve",          "Total fit",                          "l");
     addEntry("sgnSgnFunc2D_curve",   "Signal #times Signal",               "f");
@@ -904,11 +1129,11 @@ void InvariantMassFitter::plotModelOnFrame(RooPlot* frame, RooAbsPdf* pdf, bool 
         const double legBottom = doReflections ? 0.45 : 0.62;
         const double top       = showLegend ? legBottom - 0.01 : 0.89;
         const double height    = 0.042 * textLines.size();
-        TPaveText* pave = new TPaveText(0.55, std::max(0.05, top - height), 0.89, top, "NDC");
+        TPaveText* pave = new TPaveText(0.50, std::max(0.05, top - height), 0.89, top, "NDC");
         pave->SetBorderSize(0);
         pave->SetFillStyle(0);
         pave->SetTextAlign(12);
-        pave->SetTextSize(0.037);
+        pave->SetTextSize(0.032);
         for (const std::string& l : textLines) pave->AddText(l.c_str());
         frame->addObject(pave);
     }
@@ -919,7 +1144,7 @@ void InvariantMassFitter::plotModelOnFrame(RooPlot* frame, RooAbsPdf* pdf, bool 
 double InvariantMassFitter::computeChi2(RooPlot* frame, RooDataSet* data, int nFitParams) {
     // frame->chiSquare() returns chi2/ndf with ndf = nBins - nFitParams.
     // For weighted data RooFit uses sum-of-weights-squared errors on the data points.
-    const bool isWeighted = (_efficiencyMap != nullptr);
+    const bool isWeighted = weighted();
 
     double chi2Ndf = frame->chiSquare("model_curve", "data_cand1", nFitParams);
 
@@ -931,7 +1156,17 @@ double InvariantMassFitter::computeChi2(RooPlot* frame, RooDataSet* data, int nF
               << " = " << chi2Ndf << std::endl;
 
     if (isWeighted) {
-        std::cout << "  (weighted fit: N_eff = " << data->numEntries()
+        // Kish effective sample size (sum w)^2 / sum w^2: the statistical power of the weighted sample
+        double sw = 0., sw2 = 0.;
+        for (int i = 0; i < data->numEntries(); ++i) {
+            data->get(i);
+            double w = data->weight();
+            sw += w;
+            sw2 += w * w;
+        }
+        double nEffKish = sw2 > 0. ? sw * sw / sw2 : 0.;
+        std::cout << "  (weighted fit: entries = " << data->numEntries()
+                  << ", N_eff (Kish) = " << nEffKish
                   << ", sum of weights = " << data->sumEntries() << ")" << std::endl;
     }
 
@@ -1106,6 +1341,32 @@ void InvariantMassFitter::saveResultsToFile(bool const doReflections) {
             h->SetBinError(i + 1, ys[i].error);
         }
         h->Write();
+
+        // Hybrid mode: hYields_<tag> holds the corrected yields; also store the raw ones
+        if (_hybrid) {
+            TH1D* hRaw = new TH1D(("hYieldsRaw_" + tag).c_str(), (label + " raw yields in 3#sigma range").c_str(),
+                                  ys.size(), 0, ys.size());
+            for (size_t i = 0; i < ys.size(); i++) {
+                hRaw->GetXaxis()->SetBinLabel(i + 1, ys[i].label.c_str());
+                if (!ys[i].ok) continue;
+                hRaw->SetBinContent(i + 1, ys[i].rawValue);
+                hRaw->SetBinError(i + 1, ys[i].rawError);
+                std::cout << "   (raw " << ys[i].label << ": " << ys[i].rawValue << " +- " << ys[i].rawError << ")" << std::endl;
+            }
+            hRaw->Write();
+
+            auto hwIt = _hybridW.find(tag);
+            if (hwIt != _hybridW.end() && hwIt->second.ok) {
+                TH1D* hW = new TH1D(("hHybridWeights_" + tag).c_str(), (label + " mean pair weights").c_str(), 4, 0, 4);
+                const char* nm[4] = {"SgnSgn", "SgnBkg", "BkgSgn", "BkgBkg"};
+                for (int c = 0; c < 4; c++) {
+                    hW->GetXaxis()->SetBinLabel(c + 1, nm[c]);
+                    hW->SetBinContent(c + 1, hwIt->second.w[c]);
+                    hW->SetBinError(c + 1, hwIt->second.err[c]);
+                }
+                hW->Write();
+            }
+        }
     };
 
     writeYields(osRes, "osParams", "os", "OS");
@@ -1233,7 +1494,8 @@ void InvariantMassFitter::printFitResults() {
         std::cout << "Signal-Background:     " << sb->getVal() << " +- " << err(sb) << std::endl;
         std::cout << "Background-Signal:     " << bs->getVal() << " +- " << err(bs) << std::endl;
         std::cout << "Background-Background: " << bb->getVal() << " +- " << err(bb) << std::endl;
-        if (_efficiencyMap) std::cout << "(Yields are efficiency-corrected)" << std::endl;
+        if (weighted()) std::cout << "(Yields are efficiency-corrected)" << std::endl;
+        else if (_hybrid) std::cout << "(Raw yields; the hybrid correction is applied to the 3-sigma yields)" << std::endl;
     };
 
     if (osRes) printYields("osParams", "OS");
