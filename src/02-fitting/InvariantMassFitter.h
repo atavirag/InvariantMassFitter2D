@@ -57,6 +57,9 @@ public:
     // The background parameters stay free. Returns false if the file/snapshots cannot be read.
     bool fixSignalShapeFromFile(const std::string& basicFile);
 
+    // Fix mean and sigma of the weighted LS distribution to the OS values (they have better stats)
+    void setLSShapeFromOS(bool b) { _lsShapeFromOS = b; }
+
     // Core functionality
     void createVariables();
     void loadData();
@@ -147,6 +150,9 @@ private:
     // Signal shape taken from the raw fit: "os"/"ls" -> parameter name -> value
     std::map<std::string, std::map<std::string, double>> _fixedShape;
     void applyFixedShape(const std::string& tag);
+
+    bool _lsShapeFromOS = false;
+    std::vector<std::string> signalShapeNames() const;
 
     // Output
     std::string _outputRootFile;

@@ -1,7 +1,8 @@
 {
-  "output_dir": "~/analysis/double-D/InvariantMassFitter2D/data/toy_mc_closure_test",
-  "plots_dir":  "~/analysis/double-D/InvariantMassFitter2D/plots/toy_mc_closure_test",
+  "output_dir": "~/analysis/double-D/InvariantMassFitter2D/data/data_2024_full",
+  "plots_dir":  "~/analysis/double-D/InvariantMassFitter2D/plots/2024_pp",
 
+  "set_LS_shape_from_OS": true,
   "eta": 0.7,
   "pt_range": [1.0, 1000.0],
   "_pair_pt_bins": [0.0, 2.0, 4.0, 5.0, 6.0, 8.0, 10.0, 14.0, 50.0],
@@ -13,7 +14,7 @@
     "max": [2.05]
   },
 
-  "input_dir": "~/analysis/double-D/InvariantMassFitter2D/data/toy_mc_closure_test",
+  "input_dir": "~/analysis/double-D/InvariantMassFitter2D/data/data_2024_full",
 
   "periods": [
     { "name": "period2025", "input_dir": "~/Codigo/Analysis/Double-D/InvariantMassFitter2D/data/data_2025_full/preselect" },
@@ -27,11 +28,11 @@
   },
 
   "modes": {
-    "basic": { "enabled": true },
+    "basic": { "enabled": false },
     "efficiency": {
-      "enabled": false,
+      "enabled": true,
       "shape_from_basic": false,
-      "min_efficiency": 0.01,
+      "min_efficiency": 0.000001,
       "efficiency_map": {
         "file": "~/analysis/double-D/InvariantMassFitter2D/data/efficiencies/Eff_times_Acc_Map_weighted_k3.root",
         "hist": "hEfficiencyMap"

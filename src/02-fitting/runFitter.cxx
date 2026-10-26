@@ -67,6 +67,8 @@ bool runOneBin(const json& cfg, double mass_min, double mass_max,
         return false;
     }
 
+    fitter.setLSShapeFromOS(cfg["set_LS_shape_from_OS"]);
+
     fitter.setMassRange(mass_min, mass_max, mass_min, mass_max);
     fitter.setPtRange(cfg["pt_range"][0], cfg["pt_range"][1]);
     if (cfg.contains("min_efficiency")) fitter.setMinEfficiency(cfg["min_efficiency"].get<double>());

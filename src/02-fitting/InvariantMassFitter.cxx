@@ -1,5 +1,4 @@
 // InvariantMassFitter.cxx
-/// TO BE FIXED: weighed fit with the efficiency map
 
 #include "InvariantMassFitter.h"
 #include "RooGaussian.h"
@@ -106,6 +105,17 @@ std::string bkgPdfSuffix(const TString& opt) {
     return "_poly";
 }
 
+bool checkFit(RooFitResult* r, const std::string& label) {
+    if (!r) { std::cerr << "[" << label << "] fit returned no result\n"; return false; }
+    bool ok = (r->status() == 0) && (r->covQual() == 3);
+    if (!ok) {
+        std::cerr << "WARNING [" << label << "]: status=" << r->status()
+                  << " covQual=" << r->covQual() << " edm=" << r->edm()
+                  << " (expect 0 / 3 / small)\n";
+    }
+    return ok;
+}
+
 } // namespace
 
 InvariantMassFitter::InvariantMassFitter(const std::string& osFilename, const std::string& lsFilename)
@@ -177,6 +187,21 @@ bool InvariantMassFitter::loadEfficiencyMap(const std::string& filename, const s
     return true;
 }
 
+std::vector<std::string> InvariantMassFitter::signalShapeNames() const {
+    std::vector<std::string> names;
+    for (const char* idx : {"m1", "m2"}) {
+        const std::string pre = std::string(idx) + "_sig";
+        if (_sgnFuncOption == "gaussian")
+            names.insert(names.end(), {pre + "_mean", pre + "_sigma"});
+        else if (_sgnFuncOption == "doubleGaussian")
+            names.insert(names.end(), {pre + "_mean", pre + "_sigma1", pre + "_sigma2", pre + "_frac"});
+        else if (_sgnFuncOption == "crystalball")
+            for (const char* p : {"mu", "sigma", "alphaL", "nL", "alphaR", "nR"})
+                names.push_back(std::string(p) + "_" + pre);
+    }
+    return names;
+}
+
 bool InvariantMassFitter::fixSignalShapeFromFile(const std::string& basicFile) {
     std::unique_ptr<TFile> f(TFile::Open(basicFile.c_str(), "READ"));
     if (!f || f->IsZombie()) {
@@ -190,18 +215,7 @@ bool InvariantMassFitter::fixSignalShapeFromFile(const std::string& basicFile) {
     }
 
     // Signal shape parameters, depending on the signal function
-    std::vector<std::string> names;
-    for (const char* idx : {"m1", "m2"}) {
-        const std::string pre = std::string(idx) + "_sig";
-        if (_sgnFuncOption == "gaussian") {
-            names.insert(names.end(), {pre + "_mean", pre + "_sigma"});
-        } else if (_sgnFuncOption == "doubleGaussian") {
-            names.insert(names.end(), {pre + "_mean", pre + "_sigma1", pre + "_sigma2", pre + "_frac"});
-        } else if (_sgnFuncOption == "crystalball") {
-            for (const char* p : {"mu", "sigma", "alphaL", "nL", "alphaR", "nR"})
-                names.push_back(std::string(p) + "_" + pre);
-        }
-    }
+    const auto names = signalShapeNames();
 
     _fixedShape.clear();
     const std::vector<std::pair<std::string, std::string>> snaps = {{"os", "osParams"}, {"ls", "lsParams"}};
@@ -357,12 +371,15 @@ void InvariantMassFitter::loadData() {
         RooArgSet varSet(*_m1, *_m2, *_y1, *_y2, *_phi1, *_phi2, *_pt1, *_pt2, *_pairPt, *_pairMass);
         RooRealVar weightCand1("weightCand1", "weights of cand 1", 1., 0., 1e5);
         RooRealVar weightCand2("weightCand2", "weights of cand 2", 1., 0., 1e5);
+        RooRealVar combinedWeight("combinedWeight", "combined weight", 1., 0., 1e10);
 
         std::unique_ptr<RooDataSet> data;
         if (useEfficiency) {
             varSet.add(weightCand1);
             varSet.add(weightCand2);
-            data = std::make_unique<RooDataSet>(name, title, varSet, RooFit::WeightVar("combinedWeight"));
+            varSet.add(combinedWeight);
+            data = std::make_unique<RooDataSet>(name, title, varSet,
+                                                RooFit::WeightVar(combinedWeight));
         } else {
             data = std::make_unique<RooDataSet>(name, title, varSet);
         }
@@ -392,6 +409,9 @@ void InvariantMassFitter::loadData() {
             tree->GetEntry(i);
 
             double mass1, mass2;
+
+            if (pt1 < _ptMin || pt1 > _ptMax) continue;
+            if (pt2 < _ptMin || pt2 > _ptMax) continue;
 
             if (isOS) {
                 if (TESTBIT(pairType, DDbar)) {        // D Dbar
@@ -442,13 +462,18 @@ void InvariantMassFitter::loadData() {
             if (useEfficiency) {
                 varSet.setRealValue("weightCand1", wCand1);
                 varSet.setRealValue("weightCand2", wCand2);
+                varSet.setRealValue("combinedWeight", wCand1 * wCand2);
                 data->add(varSet, wCand1 * wCand2);
             } else {
                 data->add(varSet);
             }
-        }
+        } // data fill loop
 
         tree->ResetBranchAddresses();
+
+        if (useEfficiency && !data->isWeighted()) {
+            std::cerr << "ERROR: " << name << " is not weighted despite efficiency mode" << std::endl;
+        }
 
         std::cout << "Loaded " << data->numEntries() << " " << (isOS ? "OS" : "LS") << " events";
         if (useEfficiency) {
@@ -516,9 +541,10 @@ void InvariantMassFitter::buildModel(bool const doReflections) {
     RooAbsPdf* bkg2 = createBackgroundPdf("m2_bkg", *_m2);
 
     // Initial values (sum of weights, so that efficiency-corrected data works)
-    double nTot = 1000.;
-    if (_lsData)      nTot = _lsData->sumEntries();
-    else if (_osData) nTot = _osData->sumEntries();
+    double nTot = 0.;
+    if (_osData) nTot = std::max(nTot, _osData->sumEntries());
+    if (_lsData) nTot = std::max(nTot, _lsData->sumEntries());
+    if (nTot <= 0.) nTot = 1000.;
     std::cout << "Initial total yield: " << nTot << std::endl;
 
     // Four INDEPENDENT yields: no assumption that m1 and m2 are uncorrelated,
@@ -613,6 +639,7 @@ RooFitResult* InvariantMassFitter::performPrefit1D(RooDataSet* data, RooRealVar&
         return nullptr;
     }
     result->Print("v");
+    checkFit(result, name);
 
     std::cout << "Prefit results for " << name << ":" << std::endl;
     std::cout << "  Signal yield: " << nSig->getVal() << " +- " << nSig->getError() << std::endl;
@@ -823,21 +850,33 @@ void InvariantMassFitter::fit(const std::string& dataType) {
         RooFitResult* result = doFitTo(pdf, *_osData, isWeighted);
         if (result) {
             result->Print("v");
+            checkFit(result, "osFitResult");
             _workspace->import(*result, "osFitResult");
             RooArgSet* params = pdf->getParameters(*_osData);
             _workspace->saveSnapshot("osParams", *params);
+            if (_lsShapeFromOS) {
+                _fixedShape["ls"].clear();
+                for (const std::string& n : signalShapeNames())
+                    if (RooRealVar* v = _workspace->var(n.c_str()))
+                        _fixedShape["ls"][n] = v->getVal();
+            }
             delete params;
             delete result;
         }
     }
 
     if ((dataType == "LS" || dataType == "both") && _lsData) {
+        if (_lsShapeFromOS && _fixedShape["ls"].empty()) {
+            std::cerr << "LS shape is set to follow OS, but no OS fit was done first" << std::endl;
+            return;
+        }
         std::cout << "\n=== Fitting LS data ===" << std::endl;
         _workspace->loadSnapshot("initParams");
         applyFixedShape("ls");
         RooFitResult* result = doFitTo(pdf, *_lsData, isWeighted);
         if (result) {
             result->Print("v");
+            checkFit(result, "lsFitResult");
             _workspace->import(*result, "lsFitResult");
             RooArgSet* params = pdf->getParameters(*_lsData);
             _workspace->saveSnapshot("lsParams", *params);
