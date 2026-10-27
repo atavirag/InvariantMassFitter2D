@@ -35,5 +35,5 @@ source src/03-splot/run_splot.sh
 ```
 4. Cross section extraction
 ```
-python python.cross_sections.compute_xsec.py
+python -m python.cross_sections.compute_xsec.py
 ```
