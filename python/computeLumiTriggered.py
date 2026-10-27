@@ -6,7 +6,7 @@ verbose = True  # Enable verbose to see what's happening
 
 def compute_lumi_triggered():
 
-    file = TFile.Open("~/Codigo/Analysis/Double-D/InvariantMassFitter2D/data/AnalysisResults/AnalysisResults_data_2025.root", "READ")
+    file = TFile.Open("~/analysis/double-D/InvariantMassFitter2D/data/AnalysisResults/AnalysisResults_data_2024.root", "READ")
     if not file or file.IsZombie():
         print(">> ERROR File not well readout")
         return
@@ -120,7 +120,7 @@ def compute_lumi_triggered():
     hCorrLumi.SetBinContent(1, corrLumi)
     hCorrLumi.SetBinError(1, 0)
 
-    outFile = TFile("~/Codigo/Analysis/Double-D/InvariantMassFitter2D/test/Integrated_Lumi_test_2025.root", "RECREATE")
+    outFile = TFile("~/analysis/double-D/InvariantMassFitter2D/data/Integrated_Lumi_2024.root", "RECREATE")
     hCorrLumi.Write()
     outFile.Close()
 

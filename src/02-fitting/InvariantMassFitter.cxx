@@ -1,36 +1,44 @@
 // InvariantMassFitter.cxx
-
+// Class definition of the 2D fitter
 #include "InvariantMassFitter.h"
-#include "RooGaussian.h"
-#include "RooChebychev.h"
-#include "RooPolynomial.h"
+
+// RooFit
+#include "RooAbsReal.h"
 #include "RooAddPdf.h"
-#include "RooProdPdf.h"
-#include "RooFitResult.h"
 #include "RooArgList.h"
-#include "RooCurve.h"
-#include "RooFormulaVar.h"
-#include "RooConstVar.h"
-#include "RooPlot.h"
 #include "RooArgSet.h"
-#include "TMath.h"
+#include "RooConstVar.h"
+#include "RooFitResult.h"
+#include "RooFormulaVar.h"
+#include "RooGlobalFunc.h"
+#include "RooPlot.h"
+#include "RooProdPdf.h"
+
+// ROOT
+#include "TCanvas.h"
+#include "TFile.h"
 #include "TH1.h"
 #include "TH1D.h"
 #include "TH2.h"
 #include "TH2D.h"
-#include "TStyle.h"
-#include "TCanvas.h"
 #include "TLegend.h"
-#include "TPaveText.h"
+#include "TMath.h"
 #include "TMatrixD.h"
+#include "TPaveText.h"
+#include "TTree.h"
 #include "TVectorD.h"
+
+// std
 #include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <memory>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
+// project
 #include "../01-prefiltering/CandidatePair.h"
 #include "functions/BackgroundFunctions.h"
 #include "functions/SignalFunctions.h"

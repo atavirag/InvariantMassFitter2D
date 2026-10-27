@@ -59,5 +59,14 @@
         "hist": "hEfficiencyMap"
       }
     }
+  },
+  "splot": {
+    "output_dir": "/home/at52936/analysis/double-D/InvariantMassFitter2D/data/splot",
+    "variables": [
+      {"name": "pt1",      "bins": 50,  "min": 1,   "max": 24},
+      {"name": "pt2",      "bins": 50,  "min": 1,   "max": 24},
+      {"name": "pairPt",   "bins": 50,  "min": 0,   "max": 50},
+      {"name": "pairMass", "bins": 100, "min": 3.7, "max": 10}
+    ]
   }
 }

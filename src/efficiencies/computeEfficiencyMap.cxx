@@ -18,10 +18,10 @@ using namespace std;
 using json = nlohmann::json;
 
 bool verbose, debug;
-void efficiencyMap_PVContrib()
+void computeEfficiencyMap()
 {
     // Load JSON config
-    ifstream jsonFile("config-efficiencyMap_PVContrib.json");
+    ifstream jsonFile("efficiency_map_config.json");
     if (!jsonFile.is_open())
     {
         cerr << "Error: Could not open JSON file." << endl;

@@ -1,5 +1,7 @@
 # load_fitter_results.py
 
+from importlib.resources import files
+
 import uproot
 import glob
 import re
@@ -7,7 +9,9 @@ from collections import defaultdict
 import os
 
 #def load_histograms_multi(hist_names, file_pattern="/home/andrea/MyMacros/Double-Dzero-correlations/res/results/thesis_august_2025/pt_differential_results/correlations_*.root"):
-def load_histograms_multi(hist_names, corrected=True, file_pattern_corrected="/home/andrea/MyMacros/InvariantMassFitter/data/data_2025/fit_results_exponential_corrected_mass_1.73_2.05_eta_0.7_pairPt_*.root", file_pattern_uncorrected="/home/andrea/MyMacros/InvariantMassFitter/data/fit_results_exponential_mass_1.73_2.05_eta_0.7_pairPt_*.root"):
+def load_histograms_multi(hist_names, corrected=True,
+                          file_pattern_corrected="~/analysis/double-D/InvariantMassFitter2D/data/data_2024_full/fit_results_exponential_corrected_mass_1.73_2.05_eta_0.7_pairPt_*.root",
+                          file_pattern_uncorrected="~/analysis/double-D/InvariantMassFitter2D/data/data_2024_full/fit_results_exponential_mass_1.73_2.05_eta_0.7_pairPt_*.root"):
     """
     Load OS/LS histogram pairs from ROOT files with structured names.
 
@@ -32,7 +36,10 @@ def load_histograms_multi(hist_names, corrected=True, file_pattern_corrected="/h
             }
     """
     file_pattern = file_pattern_corrected if corrected else file_pattern_uncorrected
+    file_pattern = os.path.expanduser(file_pattern)
     files = glob.glob(file_pattern)
+    if not files:
+        print(f"⚠️  No files matched: {file_pattern}")
     
     # Pattern to extract pt bin from filename (e.g., fit_corrected_results_eta_0.7_pairPt_0_2.root)
     pattern = re.compile(r"fit_results_exponential_(?:corrected_)?mass_1\.73_2\.05_eta_0\.7_pairPt_(\d+)_(\d+)\.root")

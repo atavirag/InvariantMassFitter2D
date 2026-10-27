@@ -7,9 +7,9 @@ import math
 
 
 # Load histograms
-f_prompt = load_single_value_histo('/Users/atavirag/Codigo/Analysis/Double-D/InvariantMassFitter2D/results/thesis_august_2025/cut_variation/raw_prompt_frac_pol0_swapped.root', "hFitParam")
+f_prompt = load_single_value_histo('~/analysis/double-D/InvariantMassFitter2D/data/raw_prompt_frac_pol0_swapped.root', "hFitParam")
 #lumi = load_single_value_histo('/home/andrea/MyMacros/Double-Dzero-correlations/res/results/thesis_august_2025/integrated_results/Integrated_Lumi.root', "hCorrLumi")
-lumi = load_single_value_histo('/Users/atavirag/Codigo/Analysis/Double-D/InvariantMassFitter2D/test/Integrated_Lumi_2025.root', "hCorrLumi")
+lumi = load_single_value_histo('~/analysis/double-D/InvariantMassFitter2D/data/Integrated_Lumi_2024.root', "hCorrLumi")
 data = load_histograms_multi(["hYields"])
 
 # BR of D⁰ --> K⁺pi⁻

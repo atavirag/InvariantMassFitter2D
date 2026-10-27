@@ -51,7 +51,7 @@ def plot_differential_xsecs(pt_bins, xsecs, pair_type):
     plt.errorbar(
         bin_centers,
         xsec_vals,
-        yerr=xsec_stat,
+        yerr=np.zeros_like(xsec_stat),  # Set yerr to zero for the error bars
         xerr=bin_errors,
         fmt='o',
         color='blue',
@@ -191,7 +191,7 @@ def plot_differential_os_over_ls(pt_bins, os_over_ls):
     plt.errorbar(
         bin_centers,
         xsec_vals,
-        yerr=xsec_stat,
+        yerr=np.zeros_like(xsec_stat),  # Set yerr to zero for the error bars
         xerr=bin_errors,
         fmt='o',
         color='blue',
