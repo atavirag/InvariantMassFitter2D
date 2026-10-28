@@ -199,14 +199,14 @@ def plot_differential_os_over_ls(pt_bins, os_over_ls):
         capsize=0
     )
 
-    plt.ylim(0.0, 10.0)
+    plt.ylim(0.0, 15.0)
     plt.tick_params(axis='both', which='major', labelsize=14)  # for major ticks
     plt.tick_params(axis='both', which='minor', labelsize=12)  # optional, for minor ticks
 
     plt.xlabel(r"$p_{\mathrm{T}}^{\mathrm{DD}}$ (GeV/$c$)", fontsize=16)
     plt.ylabel(r"(d$\sigma_{\mathrm{D}\mathrm{D}}$/d$p_{\mathrm{T}}^{\mathrm{DD}}$) / (d$\sigma_{\mathrm{D}\bar{\mathrm{D}}}$/d$p_{\mathrm{T}}^{\mathrm{DD}}$)", fontsize=18)
     plt.title("")
-    plt.legend(frameon=False,fontsize=14, loc='center left')
+    plt.legend(frameon=False,fontsize=14, loc='lower right')
     plt.tick_params(axis='y', right=True)
     plt.tick_params(axis='x', top=True)
     plt.tick_params(direction='in')
@@ -287,7 +287,7 @@ def plot_int_cross_xsecs(xsec_os, xsec_ls):
 
     plt.xlabel(r"$\sigma^{\mathrm{DD}}$ $(\mu$b)", fontsize=13)
     plt.xscale('log')
-    plt.xlim(30, 350)
+    plt.xlim(8, 300)
     plt.ylim(0, 4)
     plt.tick_params(axis='y', labelleft=False, left=False)
     plt.tight_layout()
@@ -358,7 +358,7 @@ def plot_sigma_eff(r_os, r_ls):
 
     plt.xlabel(r"$\mathcal{R}^{\mathrm{DD}}$ (mb)", fontsize=13)
     plt.xscale('log')
-    plt.xlim(0.5, 100)
+    plt.xlim(2, 200)
     plt.ylim(0, 4)
     plt.tick_params(axis='y', labelleft=False, left=False)
     plt.tight_layout()

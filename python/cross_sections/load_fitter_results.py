@@ -10,8 +10,8 @@ import os
 
 #def load_histograms_multi(hist_names, file_pattern="/home/andrea/MyMacros/Double-Dzero-correlations/res/results/thesis_august_2025/pt_differential_results/correlations_*.root"):
 def load_histograms_multi(hist_names, corrected=True,
-                          file_pattern_corrected="~/analysis/double-D/InvariantMassFitter2D/data/data_2024_full/fit_results_exponential_corrected_mass_1.73_2.05_eta_0.7_pairPt_*.root",
-                          file_pattern_uncorrected="~/analysis/double-D/InvariantMassFitter2D/data/data_2024_full/fit_results_exponential_mass_1.73_2.05_eta_0.7_pairPt_*.root"):
+                          file_pattern_corrected="~/analysis/double-D/InvariantMassFitter2D/data/data_2026_full/fit_results_exponential_corrected_mass_1.73_2.05_eta_0.7_pairPt_*.root",
+                          file_pattern_uncorrected="~/analysis/double-D/InvariantMassFitter2D/data/data_2026_full/fit_results_exponential_mass_1.73_2.05_eta_0.7_pairPt_*.root"):
     """
     Load OS/LS histogram pairs from ROOT files with structured names.
 

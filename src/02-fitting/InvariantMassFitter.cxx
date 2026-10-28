@@ -332,9 +332,13 @@ void InvariantMassFitter::createVariables() {
     _pairMass = std::make_unique<RooRealVar>("pairMass", "m_{pair}", 0.0, 1000.0);
     _phi1 = std::make_unique<RooRealVar>("phi1", "#phi_{1}", -2*TMath::Pi(), 2*TMath::Pi());
     _phi2 = std::make_unique<RooRealVar>("phi2", "#phi_{2}", -2*TMath::Pi(), 2*TMath::Pi());
+    _eta1 = std::make_unique<RooRealVar>("eta1", "#eta_{1}", -2.0, 2.0);
+    _eta2 = std::make_unique<RooRealVar>("eta2", "#eta_{2}", -2.0, 2.0);
 
     _y1->setBins(50);
     _y2->setBins(50);
+    _eta1->setBins(50);
+    _eta2->setBins(50);
     _phi1->setBins(50);
     _phi2->setBins(50);
     _pt1->setBins(100);
@@ -347,6 +351,8 @@ void InvariantMassFitter::createVariables() {
     _workspace->import(*_m2);
     _workspace->import(*_y1);
     _workspace->import(*_y2);
+    _workspace->import(*_eta1);
+    _workspace->import(*_eta2);
     _workspace->import(*_phi1);
     _workspace->import(*_phi2);
     _workspace->import(*_pt1);
@@ -376,7 +382,7 @@ void InvariantMassFitter::loadData() {
 
         if (!tree || tree->GetEntries() == 0) return nullptr;
 
-        RooArgSet varSet(*_m1, *_m2, *_y1, *_y2, *_phi1, *_phi2, *_pt1, *_pt2, *_pairPt, *_pairMass);
+        RooArgSet varSet(*_m1, *_m2, *_y1, *_y2, *_eta1, *_eta2, *_phi1, *_phi2, *_pt1, *_pt2, *_pairPt, *_pairMass);
         RooRealVar weightCand1("weightCand1", "weights of cand 1", 1., 0., 1e5);
         RooRealVar weightCand2("weightCand2", "weights of cand 2", 1., 0., 1e5);
         RooRealVar combinedWeight("combinedWeight", "combined weight", 1., 0., 1e10);
@@ -393,7 +399,7 @@ void InvariantMassFitter::loadData() {
         }
 
         float m1_val, m2_val, mbar1_val, mbar2_val;
-        float pt1, pt2, y1, y2, phi1, phi2;
+        float pt1, pt2, y1, y2, phi1, phi2, eta1, eta2;
         double pairPt, pairMass;
         UChar_t pairType;
 
@@ -402,6 +408,8 @@ void InvariantMassFitter::loadData() {
         tree->SetBranchAddress("mbar1", &mbar1_val);
         tree->SetBranchAddress("mbar2", &mbar2_val);
         tree->SetBranchAddress("pairType", &pairType);
+        tree->SetBranchAddress("eta1", &eta1);
+        tree->SetBranchAddress("eta2", &eta2);
         tree->SetBranchAddress("y1", &y1);
         tree->SetBranchAddress("y2", &y2);
         tree->SetBranchAddress("phi1", &phi1);
@@ -460,6 +468,8 @@ void InvariantMassFitter::loadData() {
             _m2->setVal(mass2);
             _y1->setVal(y1);
             _y2->setVal(y2);
+            _eta1->setVal(eta1);
+            _eta2->setVal(eta2);
             _phi1->setVal(phi1);
             _phi2->setVal(phi2);
             _pt1->setVal(pt1);

@@ -50,6 +50,9 @@ AXIS_TITLES = {
     "pairMass": "#it{m}_{pair} (GeV/#it{c}^{2})",
     "deltaY": "#Delta#it{y}",
     "deltaPhi": "#Delta#varphi (rad)",
+    "deltaEta": "#Delta#eta",
+    "deltaPhiCorrelations": "#Delta#varphi (rad)",
+    "xJ": "#it{x}_{J}",
 }
 
 
@@ -130,6 +133,8 @@ def plot_components(f, tag, var, outdir, norm, logy):
     c.SetLeftMargin(0.14)
     c.SetRightMargin(0.05)
     c.SetTopMargin(0.05)
+    c.SetTicks()
+    c.SetGrid()
     set_y_range(hists, logy)
 
     first = hists[0]
@@ -141,7 +146,7 @@ def plot_components(f, tag, var, outdir, norm, logy):
     for h in hists[1:]:
         h.Draw("E1 SAME")
 
-    leg = ROOT.TLegend(0.6, 0.73, 0.89, 0.93)
+    leg = ROOT.TLegend(0.6, 0.73, 0.86, 0.93)
     leg.SetBorderSize(0)
     leg.SetFillStyle(0)
     leg.SetTextSize(0.03)
@@ -174,6 +179,9 @@ def plot_ss_os_vs_ls(f, var, outdir, norm, logy):
     # --- upper pad
     p1.cd()
     p1.SetLogy(logy)
+    p1.SetTicks()
+    p1.SetGrid()
+    #p1.SetGridColor(ROOT.kGray-3)
     set_y_range([h_os, h_ls], logy)
     h_os.SetTitle("")
     h_os.GetYaxis().SetTitle("Normalised sWeighted entries" if norm else "sWeighted entries")
@@ -191,6 +199,9 @@ def plot_ss_os_vs_ls(f, var, outdir, norm, logy):
 
     # --- ratio pad
     p2.cd()
+    p2.SetTicks()
+    p2.SetGrid()
+    #p2.SetGridColor(ROOT.kGray-3)
     ratio = h_os.Clone(f"ratio_{var}")
     ratio.SetDirectory(0)
     ratio.Divide(h_ls)
@@ -289,6 +300,134 @@ def draw_overview(outpath, panels, legend_entries, norm, logy, tag_label=None):
     c.SaveAs(outpath)
     print(f"  overview saved: {outpath}")
 
+# ---------------------------------------------------------------- 2D helpers
+def discover_variables_2d(f):
+    """Keys '<x>_<y>' found as h2_<tag>_<x>_<y>_<species> in the file."""
+    keys = []
+    for key in f.GetListOfKeys():
+        name = key.GetName()
+        for tag in ("os", "ls"):
+            for sp in SPECIES:
+                pre, suf = f"h2_{tag}_", f"_{sp}"
+                if name.startswith(pre) and name.endswith(suf):
+                    k = name[len(pre):-len(suf)]
+                    if k not in keys:
+                        keys.append(k)
+    return keys
+
+
+def get_hist2d(f, tag, key, sp):
+    h = f.Get(f"h2_{tag}_{key}_{sp}")
+    if not h:
+        return None
+    h = h.Clone(f"{h.GetName()}_plot")
+    h.SetDirectory(0)
+    return h
+
+
+def axis_titles_2d(key, h):
+    """(x title, y title). Assumes variable names contain no underscore; otherwise
+    falls back to the titles stored in the histogram by SPlotter."""
+    parts = key.split("_")
+    if len(parts) == 2:
+        return AXIS_TITLES.get(parts[0], parts[0]), AXIS_TITLES.get(parts[1], parts[1])
+    return h.GetXaxis().GetTitle(), h.GetYaxis().GetTitle()
+
+
+def prepare2d(h, color, norm):
+    """Unit-volume normalisation (if requested) and LEGO styling. Returns the raw integral."""
+    raw = h.Integral()
+    if norm and raw > 0:
+        h.Scale(1.0 / raw)
+    h.SetFillColor(color)
+    h.SetLineColor(ROOT.kBlack)
+    h.SetLineWidth(1)
+    return raw
+
+
+def style_lego_pad(pad, logz):
+    pad.SetLeftMargin(0.14)
+    pad.SetRightMargin(0.06)
+    pad.SetTopMargin(0.08)
+    pad.SetBottomMargin(0.14)
+    pad.SetTheta(25)
+    pad.SetPhi(-125)
+    pad.SetLogz(logz)
+
+
+def draw_lego(h, key, norm):
+    xt, yt = axis_titles_2d(key, h)
+    h.SetTitle("")
+    h.GetXaxis().SetTitle(xt)
+    h.GetYaxis().SetTitle(yt)
+    h.GetZaxis().SetTitle("Normalised sWeighted entries" if norm else "sWeighted entries")
+    for ax, off in ((h.GetXaxis(), 1.8), (h.GetYaxis(), 1.8), (h.GetZaxis(), 1.4)):
+        ax.SetTitleOffset(off)
+        ax.SetTitleSize(0.04)
+        ax.SetLabelSize(0.035)
+    h.Draw("LEGO2")
+
+
+# ---------------------------------------------------------------- 2D plots
+def plot_components_2d(f, tag, key, outdir, norm, logz):
+    """Four components of one sample (OS or LS), one LEGO pad each."""
+    pads = []
+    for sp in SPECIES:
+        h = get_hist2d(f, tag, key, sp)
+        if h is None:
+            continue
+        prepare2d(h, COLORS[sp], norm)
+        pads.append((sp, h))
+    if not pads:
+        print(f"  [{tag}] {key}: no 2D histograms found, skipped")
+        return
+
+    c = ROOT.TCanvas(f"c2_{tag}_{key}", "", 1200, 1000)
+    c.Divide(2, 2, 0.001, 0.001)
+    for i, (sp, h) in enumerate(pads, start=1):
+        pad = c.cd(i)
+        style_lego_pad(pad, logz)
+        draw_lego(h, key, norm)
+        draw_label(f"{TAG_LABELS[tag]}: {LABELS[sp]}", x=0.14, y=0.94)
+
+    c.SaveAs(os.path.join(outdir, f"{key}_components_{tag}_2D.pdf"))
+
+
+def plot_ss_os_vs_ls_2d(f, key, outdir, norm, logz):
+    """SgnSgn OS and LS side by side."""
+    h_os = get_hist2d(f, "os", key, "SgnSgn")
+    h_ls = get_hist2d(f, "ls", key, "SgnSgn")
+    if h_os is None or h_ls is None:
+        print(f"  {key}: SgnSgn OS or LS missing (2D), skipped")
+        return
+    prepare2d(h_os, TAG_COLORS["os"], norm)
+    prepare2d(h_ls, TAG_COLORS["ls"], norm)
+
+    c = ROOT.TCanvas(f"c2_ss_{key}", "", 1400, 650)
+    c.Divide(2, 1, 0.001, 0.001)
+    for i, (tag, h) in enumerate((("os", h_os), ("ls", h_ls)), start=1):
+        pad = c.cd(i)
+        style_lego_pad(pad, logz)
+        draw_lego(h, key, norm)
+        draw_label(f"{TAG_LABELS[tag]}: sig-sig", x=0.14, y=0.94)
+
+    c.SaveAs(os.path.join(outdir, f"{key}_ss_os_vs_ls_2D.pdf"))
+
+def plot_ss_single_2d(f, tag, key, outdir, norm, logz):
+    """SgnSgn only, one sample (OS or LS), single large LEGO canvas."""
+    h = get_hist2d(f, tag, key, "SgnSgn")
+    if h is None:
+        print(f"  [{tag}] {key}: SgnSgn missing (2D), skipped")
+        return
+    raw = prepare2d(h, COLORS["SgnSgn"], norm)
+
+    c = ROOT.TCanvas(f"c2_ss_only_{tag}_{key}", "", 900, 750)
+    style_lego_pad(c, logz)
+    draw_lego(h, key, norm)
+    draw_label(f"{TAG_LABELS[tag]}: sig-sig (N = {raw:.3g})", x=0.14, y=0.94)
+
+    c.SaveAs(os.path.join(outdir, f"{key}_ss_{tag}_2D.pdf"))
+
 # ---------------------------------------------------------------- main
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
@@ -297,6 +436,9 @@ def main():
     ap.add_argument("--variables", nargs="*", default=None, help="subset; default: all in the file")
     ap.add_argument("--no-norm", action="store_true", help="plot sWeighted counts instead of unit area")
     ap.add_argument("--logy", action="store_true")
+    ap.add_argument("--variables2D", nargs="*", default=None,
+                    help="2D subset as <x>_<y> (e.g. deltaY_deltaPhi); default: all in the file")
+    ap.add_argument("--no-2d", action="store_true", help="skip the 2D LEGO plots")
     ap.add_argument("--overview-only", action="store_true",
                     help="skip the per-variable files, only write the overview canvases")
     args = ap.parse_args()
@@ -336,6 +478,17 @@ def main():
                 ss_panels.append((var, list(ss)))
                 if ss_legend is None:
                     ss_legend = [(ss[0], "OS sig-sig"), (ss[1], "LS sig-sig")]
+
+        if not args.no_2d:
+            keys2d = args.variables2D or discover_variables_2d(f)
+            print(f"  {len(keys2d)} 2D variable pair(s)")
+            for key in keys2d:
+                print(f"  {key} (2D)")
+                plot_components_2d(f, "os", key, outdir, norm, args.logy)
+                plot_components_2d(f, "ls", key, outdir, norm, args.logy)
+                plot_ss_os_vs_ls_2d(f, key, outdir, norm, args.logy)
+                plot_ss_single_2d(f, "os", key, outdir, norm, args.logy)
+                plot_ss_single_2d(f, "ls", key, outdir, norm, args.logy)
 
         for tag in ("os", "ls"):
             draw_overview(os.path.join(outdir, f"overview_components_{tag}.pdf"),

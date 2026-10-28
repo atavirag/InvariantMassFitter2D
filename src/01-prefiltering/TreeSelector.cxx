@@ -137,7 +137,8 @@ ROOT::Math::PxPyPzMVector TreeSelector::createLorentzVector(double const &phi, d
   // Calculate momentum components
   double const px = pt * cos(phi);
   double const py = pt * sin(phi);
-  double const pz = pt * sinh(y);
+  double const mT = std::sqrt(m * m + pt * pt);
+  double const pz = mT * std::sinh(y);
 
   // Create the Lorentz vector
   ROOT::Math::PxPyPzMVector lorentzVector(px, py, pz, m);
@@ -170,6 +171,8 @@ void TreeSelector::saveTreesOSvsLS(const std::string& osFilename, const std::str
         tree.Branch("y2", &entry.y2);
         tree.Branch("phi1", &entry.phi1);
         tree.Branch("phi2", &entry.phi2);
+        tree.Branch("eta1", &entry.eta1);
+        tree.Branch("eta2", &entry.eta2);
         tree.Branch("m1", &entry.m1);
         tree.Branch("m2", &entry.m2);
         tree.Branch("mbar1", &entry.mbar1);
@@ -237,6 +240,8 @@ void TreeSelector::saveTreesOSvsLS(const std::string& osFilename, const std::str
     std::cout << "OS tree entries: " << osTree.GetEntries() 
           << " LS tree entries: " << lsTree.GetEntries() 
           << " Total selected: " << _selectedEntries.size() << std::endl;
+
+    //osTree.Print();
 
     lsFile.cd();
     lsTree.Write();

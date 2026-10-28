@@ -14,7 +14,7 @@ private:
     TTree* _tree;
 
     // Branch variables
-    float ptCand1, ptCand2, yCand1, yCand2, phiCand1, phiCand2;
+    float ptCand1, ptCand2, yCand1, yCand2, phiCand1, phiCand2, etaCand1, etaCand2;
     float mDCand1, mDCand2, mDbarCand1, mDbarCand2;
     UChar_t typeCand1, typeCand2, typePair;
 };

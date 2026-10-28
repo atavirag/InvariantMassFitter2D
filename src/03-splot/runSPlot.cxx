@@ -50,6 +50,14 @@ bool runOneBin(const json& cfg, double mass_min, double mass_max, double pt_min,
         sp.addVariable(v.at("name").get<string>(), v.at("bins").get<int>(),
                        v.at("min").get<double>(),  v.at("max").get<double>());
 
+        // Optional 2D variables (key may be absent)
+        if (cfg.contains("variables2D"))
+            for (const auto& v : cfg.at("variables2D"))
+                sp.addVariable2D(v.at("x").at("name").get<string>(), v.at("x").at("bins").get<int>(),
+                                 v.at("x").at("min").get<double>(),  v.at("x").at("max").get<double>(),
+                                 v.at("y").at("name").get<string>(), v.at("y").at("bins").get<int>(),
+                                 v.at("y").at("min").get<double>(),  v.at("y").at("max").get<double>());
+
     const bool okOS = sp.run("os");
     const bool okLS = sp.run("ls");
     if (!okOS && !okLS) {

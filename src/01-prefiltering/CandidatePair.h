@@ -5,6 +5,7 @@ struct CandidatePair {
     float pt1, pt2;
     float y1, y2;
     float phi1, phi2;
+    float eta1, eta2;
     float m1, m2;
     float mbar1, mbar2;
     UChar_t type1, type2, pairType;

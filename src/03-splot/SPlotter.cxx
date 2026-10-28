@@ -26,12 +26,21 @@ double foldedDeltaPhi(double a, double b) {          // |Δφ| folded into [0, �
     return d > TMath::Pi() ? TMath::TwoPi() - d : d;
 }
 
+double deltaPhiCorrelations(double a, double b) {              // (a - b) wrapped into [-π/2, 3π/2)
+    const double lo = -TMath::PiOver2();
+    double d = std::fmod(a - b - lo, TMath::TwoPi());
+    if (d < 0) d += TMath::TwoPi();
+    return d + lo;
+}
+
 using Fn = std::function<double(const RooArgSet&)>;
 const std::map<std::string, Fn>& derived() {
     static const std::map<std::string, Fn> m = {
-        {"deltaY",   [](const RooArgSet& r) { return r.getRealValue("y1") - r.getRealValue("y2"); }},
-        {"deltaPhi", [](const RooArgSet& r) { return foldedDeltaPhi(r.getRealValue("phi1"), r.getRealValue("phi2")); }},
-        {"xJ",       [](const RooArgSet& r) {
+        {"deltaY",               [](const RooArgSet& r) { return r.getRealValue("y1") - r.getRealValue("y2"); }},
+        {"deltaEta",             [](const RooArgSet& r) { return r.getRealValue("eta1") - r.getRealValue("eta2"); }},
+        {"deltaPhi",             [](const RooArgSet& r) { return foldedDeltaPhi(r.getRealValue("phi1"), r.getRealValue("phi2")); }},
+        {"deltaPhiCorrelations", [](const RooArgSet& r) { return deltaPhiCorrelations(r.getRealValue("phi1"), r.getRealValue("phi2")); }},
+        {"xJ",                   [](const RooArgSet& r) {
             double a = r.getRealValue("pt1"), b = r.getRealValue("pt2");
             return std::min(a, b) / std::max(a, b); }},
     };
@@ -57,9 +66,15 @@ void SPlotter::addVariable(const std::string& n, int nb, double lo, double hi) {
     _vars.push_back({n, nb, lo, hi});
 }
 
+void SPlotter::addVariable2D(const std::string& nx, int nbx, double lox, double hix,
+                             const std::string& ny, int nby, double loy, double hiy) {
+    _vars2D.push_back({nx, nbx, lox, hix, ny, nby, loy, hiy});
+}
+
 bool SPlotter::run(const std::string& tag) {
     // load the workspace
     if (!_ws) return false;
+    _ws->data("osData")->get()->Print();   // eta1, eta2 should be listed
     auto* data = dynamic_cast<RooDataSet*>(_ws->data((tag + "Data").c_str()));
     auto* pdf  = dynamic_cast<RooAddPdf*>(_ws->pdf("model"));
     if (!data || !pdf) { std::cerr << "Missing " << tag << "Data or model\n"; return false; }
@@ -120,10 +135,37 @@ bool SPlotter::run(const std::string& tag) {
                 hs[k]->Fill(x, r->getRealValue((kSpecies[k].first + "_sw").c_str()));
         }
     }
+        // Fill raw sWeighted 2D histograms
+    for (const SPlotVar2D& v : _vars2D) {
+        const RooArgSet& first = *sd->get(0);
+        if (!isKnown(v.nameX, first) || !isKnown(v.nameY, first)) {
+            std::cerr << "Variables " << v.nameX << " / " << v.nameY << " not available, skipped\n";
+            continue;
+        }
+        std::vector<TH2D*> hs;
+        for (const auto& s : kSpecies) {
+            auto h = std::make_unique<TH2D>(
+                ("h2_" + tag + "_" + v.nameX + "_" + v.nameY + "_" + s.second).c_str(),
+                (tag + " " + s.second + ";" + v.nameX + ";" + v.nameY + ";sWeighted entries").c_str(),
+                v.nBinsX, v.minX, v.maxX, v.nBinsY, v.minY, v.maxY);
+            h->Sumw2();
+            h->SetDirectory(nullptr);
+            hs.push_back(h.get());
+            _histos2D.push_back(std::move(h));
+        }
+        for (int i = 0; i < sd->numEntries(); ++i) {
+            const RooArgSet* r = sd->get(i);
+            double x = valueOf(v.nameX, *r);
+            double y = valueOf(v.nameY, *r);
+            for (size_t k = 0; k < kSpecies.size(); ++k)
+                hs[k]->Fill(x, y, r->getRealValue((kSpecies[k].first + "_sw").c_str()));
+        }
+    }
     return true;
 }
 
 void SPlotter::save(const std::string& outFile) {
     std::unique_ptr<TFile> out(TFile::Open(outFile.c_str(), "RECREATE"));
     for (auto& h : _histos) h->Write();
+    for (auto& h : _histos2D) h->Write();
 }

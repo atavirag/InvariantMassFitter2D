@@ -3,9 +3,9 @@
     "debug": false,
 
     "files": {
-        "filenameGen": "~/analysis/double-D/InvariantMassFitter2D/data/AnalysisResults/AnalysisResults_k3.root",
-        "filenameReco": "~/analysis/double-D/InvariantMassFitter2D/data/AnalysisResults/AnalysisResults_k3.root",
-        "filenameData": "~/analysis/double-D/InvariantMassFitter2D/data/AnalysisResults/AnalysisResults_data_2024.root"
+        "filenameGen": "~/analysis/double-D/InvariantMassFitter2D/data/AnalysisResults/AnalysisResults_g5.root",
+        "filenameReco": "~/analysis/double-D/InvariantMassFitter2D/data/AnalysisResults/AnalysisResults_g5.root",
+        "filenameData": "~/analysis/double-D/InvariantMassFitter2D/data/AnalysisResults/AnalysisResults_data_2026.root"
     },
 
     "histos": {
@@ -20,5 +20,5 @@
 
     "isLog_eff": false,
     "outputDir": "~/analysis/double-D/InvariantMassFitter2D/data/efficiencies/",
-    "outputFile": "Eff_times_Acc_Map_weighted_k3.root"
+    "outputFile": "Eff_times_Acc_Map_weighted_g5.root"
 }

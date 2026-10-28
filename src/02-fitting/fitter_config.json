@@ -1,11 +1,11 @@
 {
-  "output_dir": "~/analysis/double-D/InvariantMassFitter2D/data/data_2024_full",
-  "plots_dir":  "~/analysis/double-D/InvariantMassFitter2D/plots/2024_pp",
+  "output_dir": "~/analysis/double-D/InvariantMassFitter2D/data/data_2026_full",
+  "plots_dir":  "~/analysis/double-D/InvariantMassFitter2D/plots/2026_pp",
 
   "set_LS_shape_from_OS": true,
   "eta": 0.7,
   "pt_range": [1.0, 1000.0],
-  "_pair_pt_bins": [0.0, 2.0, 4.0, 5.0, 6.0, 8.0, 10.0, 14.0, 50.0],
+  "_pair_pt_bins": [0.0, 2.0, 4.0, 5.0, 6.0, 8.0, 10.0, 24.0],
   "pair_pt_bins": [0.0, 100.0],
   "mass_bins": {
     "_min": [1.71, 1.72, 1.73, 1.74, 1.75],
@@ -14,12 +14,7 @@
     "max": [2.05]
   },
 
-  "input_dir": "~/analysis/double-D/InvariantMassFitter2D/data/data_2024_full",
-
-  "periods": [
-    { "name": "period2025", "input_dir": "~/Codigo/Analysis/Double-D/InvariantMassFitter2D/data/data_2025_full/preselect" },
-    { "name": "period2024", "input_dir": "~/Codigo/Analysis/Double-D/InvariantMassFitter2D/data/y_0.7_test/preselect" }
-  ],
+  "input_dir": "~/analysis/double-D/InvariantMassFitter2D/data/data_2026_full",
 
   "fit_functions": {
     "signal":     "gaussian",
@@ -28,45 +23,36 @@
   },
 
   "modes": {
-    "basic": { "enabled": false },
+    "basic": { "enabled": true },
     "efficiency": {
       "enabled": true,
       "shape_from_basic": false,
-      "min_efficiency": 0.000001,
+      "min_efficiency": 0.00001,
       "efficiency_map": {
-        "file": "~/analysis/double-D/InvariantMassFitter2D/data/efficiencies/Eff_times_Acc_Map_weighted_k3.root",
+        "file": "~/analysis/double-D/InvariantMassFitter2D/data/efficiencies/Eff_times_Acc_Map_weighted_g5.root",
         "hist": "hEfficiencyMap"
       }
     },
     "reflections": {
-      "enabled": false,
+      "enabled": true,
       "refl_over_sgn": 0.15,
       "shape_from_basic": false,
-      "min_efficiency": 0.01,
+      "min_efficiency": 0.00001,
       "efficiency_map": {
-        "file": "~/analysis/double-D/InvariantMassFitter2D/data/efficiencies/Eff_times_Acc_Map_weighted_k3.root",
+        "file": "~/analysis/double-D/InvariantMassFitter2D/data/efficiencies/Eff_times_Acc_Map_weighted_g5.root",
         "hist": "hEfficiencyMap"
       }
     },
     "reflections_raw": {
-      "enabled": false,
+      "enabled": true,
       "refl_over_sgn": 0.15
     },
     "efficiency_hybrid": {
-      "enabled": false,
+      "enabled": true,
       "efficiency_map": {
-        "file": "~/analysis/double-D/InvariantMassFitter2D/data/efficiencies/Eff_times_Acc_Map_weighted_k3.root",
+        "file": "~/analysis/double-D/InvariantMassFitter2D/data/efficiencies/Eff_times_Acc_Map_weighted_g5.root",
         "hist": "hEfficiencyMap"
       }
     }
-  },
-  "splot": {
-    "output_dir": "/home/at52936/analysis/double-D/InvariantMassFitter2D/data/splot",
-    "variables": [
-      {"name": "pt1",      "bins": 50,  "min": 1,   "max": 24},
-      {"name": "pt2",      "bins": 50,  "min": 1,   "max": 24},
-      {"name": "pairPt",   "bins": 50,  "min": 0,   "max": 50},
-      {"name": "pairMass", "bins": 100, "min": 3.7, "max": 10}
-    ]
   }
 }

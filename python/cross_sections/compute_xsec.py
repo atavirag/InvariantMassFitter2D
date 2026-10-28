@@ -9,7 +9,7 @@ import math
 # Load histograms
 f_prompt = load_single_value_histo('~/analysis/double-D/InvariantMassFitter2D/data/raw_prompt_frac_pol0_swapped.root', "hFitParam")
 #lumi = load_single_value_histo('/home/andrea/MyMacros/Double-Dzero-correlations/res/results/thesis_august_2025/integrated_results/Integrated_Lumi.root', "hCorrLumi")
-lumi = load_single_value_histo('~/analysis/double-D/InvariantMassFitter2D/data/Integrated_Lumi_2024.root', "hCorrLumi")
+lumi = load_single_value_histo('~/analysis/double-D/InvariantMassFitter2D/data/Integrated_Lumi_2026.root', "hCorrLumi")
 data = load_histograms_multi(["hYields"])
 
 # BR of D⁰ --> K⁺pi⁻
@@ -32,7 +32,7 @@ single_D0_xsec_2_24_eta_07 = [x * 1.4 for x in single_D0_xsec_2_24]
 #       [f_prompt, lumi, trigger_eff, BDT_sel, yield, ITS_TPC, single_track, track_tuner, BR]
 
 # Access data
-pt_bins = ["0_2", "2_4", "4_5", "5_6", "6_8", "8_10", "10_14", "14_50"]
+pt_bins = ["0_2", "2_4", "4_5", "5_6", "6_8", "8_10", "10_24"]
 int_pt_bin = "0_100"
 xsecs_os = []
 xsecs_ls = []

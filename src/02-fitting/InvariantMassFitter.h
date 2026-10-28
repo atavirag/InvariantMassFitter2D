@@ -118,6 +118,7 @@ private:
 
     // Kinematic variables
     std::unique_ptr<RooRealVar> _y1, _y2;
+    std::unique_ptr<RooRealVar> _eta1, _eta2;
     std::unique_ptr<RooRealVar> _phi1, _phi2;
     std::unique_ptr<RooRealVar> _pt1, _pt2, _pairPt, _pairMass;
 

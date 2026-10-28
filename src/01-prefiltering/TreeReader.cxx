@@ -8,12 +8,16 @@ TreeReader::TreeReader(TTree* tree) : _tree(tree) {
         return;
     }
 
+    _tree->Print();
+
     _tree->SetBranchAddress("fPtCand1", &ptCand1);
     _tree->SetBranchAddress("fPtCand2", &ptCand2);
     _tree->SetBranchAddress("fYCand1", &yCand1);
     _tree->SetBranchAddress("fYCand2", &yCand2);
     _tree->SetBranchAddress("fPhiCand1", &phiCand1);
     _tree->SetBranchAddress("fPhiCand2", &phiCand2);
+    _tree->SetBranchAddress("fEtaCand1", &etaCand1);
+    _tree->SetBranchAddress("fEtaCand2", &etaCand2);
     _tree->SetBranchAddress("fMDCand1", &mDCand1);
     _tree->SetBranchAddress("fMDCand2", &mDCand2);
     _tree->SetBranchAddress("fMDbarCand1", &mDbarCand1);
@@ -35,6 +39,7 @@ std::vector<CandidatePair> TreeReader::getAllEntries() {
         pair.pt1 = ptCand1;  pair.pt2 = ptCand2;
         pair.y1 = yCand1;    pair.y2 = yCand2;
         pair.phi1 = phiCand1; pair.phi2 = phiCand2;
+        pair.eta1 = etaCand1; pair.eta2 = etaCand2;
         pair.m1 = mDCand1;   pair.m2 = mDCand2;
         pair.mbar1 = mDbarCand1;   pair.mbar2 = mDbarCand2;
         pair.type1 = typeCand1; pair.type2 = typeCand2;
