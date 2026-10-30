@@ -1,0 +1,22 @@
+{
+  "input_file": " ~/analysis/double-D/InvariantMassFitter2D/data/AO2Ds/AO2D_me_2026ax.root",
+  "tree_name_cand1": "O2dmescand1",
+  "tree_name_cand2": "O2dmescand2",
+  "output_dir": " ~/analysis/double-D/InvariantMassFitter2D/data/mixed_event_2026_MB",
+  "fixed": {
+    "pt_min": 1.0,
+    "pt_max": 1000.0,
+    "eta_min": -0.7,
+    "eta_max": 0.7,
+    "remove_ambiguous": true,
+    "mix_depth": 10
+  },
+  "_mass_bins": {
+    "min": [1.70, 1.71, 1.72, 1.73, 1.74, 1.75],
+    "max": [2.00, 2.01, 2.02, 2.03, 2.04, 2.05, 2.06]
+  },
+  "mass_bins": {
+    "min": [1.73],
+    "max": [2.05]
+  }
+}
