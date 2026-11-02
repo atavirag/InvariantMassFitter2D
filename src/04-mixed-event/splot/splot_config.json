@@ -1,0 +1,44 @@
+{
+  "eta": 0.7,
+  "background": "exponential",
+  "fit_suffix": "",
+  "mass_bins": { "min": [1.73], "max": [2.05] },
+  "pair_pt_bins": [0, 100],
+  "fit_results_dir": "/home/at52936/analysis/double-D/InvariantMassFitter2D/data/data_2026_full",
+  "output_dir": "/home/at52936/analysis/double-D/InvariantMassFitter2D/data/splot_2026",
+
+  "me": {
+    "enabled": true,
+    "tree_name": "pairs",
+    "input_dir": "/home/at52936/analysis/double-D/InvariantMassFitter2D/data/mixed_event_2026_MB",
+    "fit_results_dir": "/home/at52936/analysis/double-D/InvariantMassFitter2D/data/mixed_event_2026_MB",
+    "output_dir": "/home/at52936/analysis/double-D/InvariantMassFitter2D/data/mixed_event_2026_MB",
+    "plots_dir": "/home/at52936/analysis/double-D/InvariantMassFitter2D//plots/2026_pp/splot_me",
+    "fit_suffix": "",
+    "norm_deta": 0.2,
+    "norm_dphi": 0.4
+  },
+
+  "variables": [
+    { "name": "pt1", "bins": 50, "min": 1, "max": 24 },
+    { "name": "pt2", "bins": 50, "min": 1, "max": 24 },
+    { "name": "pairPt", "bins": 50, "min": 0, "max": 50 },
+    { "name": "pairMass", "bins": 110, "min": 3.5, "max": 10 },
+    { "name": "y1", "bins": 40, "min": -1, "max": 1 },
+    { "name": "y2", "bins": 40, "min": -1, "max": 1 },
+    { "name": "eta1", "bins": 40, "min": -1, "max": 1 },
+    { "name": "eta2", "bins": 40, "min": -1, "max": 1 },
+    { "name": "phi1", "bins": 36, "min": 0.0, "max": 6.2832 },
+    { "name": "phi2", "bins": 36, "min": 0.0, "max": 6.2832 },
+    { "name": "deltaY", "bins": 28, "min": -1.4, "max": 1.4 },
+    { "name": "deltaPhi", "bins": 40, "min": 0, "max": 3.14159 },
+    { "name": "deltaEta", "bins": 40, "min": -1.4, "max": 1.4 }
+  ],
+
+  "variables2D": [
+    {
+      "x": { "name": "deltaEta", "bins": 30, "min": -1.5, "max": 1.5 },
+      "y": { "name": "deltaPhiCorrelations", "bins": 64, "min": -1.57079633, "max": 4.71238898 }
+    }
+  ]
+}
