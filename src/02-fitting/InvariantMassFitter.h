@@ -28,6 +28,7 @@ public:
     struct HybridWeights { std::vector<double> w; std::vector<double> err; bool ok = false; };
 
     InvariantMassFitter(const std::string& osFilename, const std::string& lsFilename);
+    InvariantMassFitter();   // for ME-only use, no OS/LS files
     ~InvariantMassFitter();
 
     // True if both input files and both trees were opened correctly
@@ -70,6 +71,12 @@ public:
     void performPrefit(const std::string& dataType = "both", bool useReflections = false);
     void setPrefitParameters(bool const doReflections = false);
     void plotPrefitResults(const std::string& outputPrefix);
+
+    // ME fits
+    bool loadMEData(const std::string& meFilename, const std::string& treeName = "pairs");
+    void performPrefitME(bool useReflections = false);
+    void plotPrefitResultsME(const std::string& outputPrefix);
+    void saveMEResultsToFile();
 
     // Output and visualization
     void plotFit(const std::string& outputPrefix, bool const doReflections = false);
@@ -136,6 +143,12 @@ private:
     RooFitResult* performPrefit1D(RooDataSet* data, RooRealVar& mass,
                                   const std::string& name, bool useReflections);
     void extractPrefitParameters(const std::string& prefitName, const std::string& targetName);
+
+    // ME fits
+    std::unique_ptr<TFile>       _meFile;
+    TTree*                       _meTree = nullptr;
+    std::unique_ptr<RooDataSet>  _meData1, _meData2;
+    std::unique_ptr<RooFitResult> _prefitResult_me_m1, _prefitResult_me_m2;
 
     // Datasets
     std::unique_ptr<RooDataSet> _osData;

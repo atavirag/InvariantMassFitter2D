@@ -47,6 +47,78 @@ string binLabel(double mass_min, double mass_max, double eta, double pt_min, dou
          + "_pairPt_" + fmtPt(pt_min) + "_" + fmtPt(pt_max);
 }
 
+// Bin edge as written, without truncation: 1 -> "1", 1.5 -> "1.5"
+string fmtBinEdge(double v) {
+    ostringstream ss;
+    ss << v;
+    return ss.str();
+}
+
+// Label for ME fits, e.g. "mass_1.73_2.05_eta_0.7"
+string meBinLabel(double mass_min, double mass_max, double eta) {
+    return "mass_" + fmtMass(mass_min) + "_" + fmtMass(mass_max)
+         + "_eta_" + fmtEta(eta);
+}
+
+// 1D prefit of the mixed-event candidate mass spectra (m1 and m2) in one candidate-pT bin.
+// Returns false if the bin could not be processed.
+bool runOneBinME(const json& cfg, double mass_min, double mass_max) {
+
+    const json& me = cfg["me_fit"];
+    double eta        = cfg["eta"];
+    string input_dir  = cfg["input_dir"];
+    string output_dir = cfg["output_dir"];
+    string plots_dir  = cfg["plots_dir"];
+    string bkgFunction = cfg["fit_functions"]["background"];
+
+    // Same naming as preselect: me_tree_<mmin>_<mmax>_eta_<eta>.root
+    string me_file = input_dir + "/me_tree_" + fmtMass(mass_min) + "_" + fmtMass(mass_max)
+                   + "_eta_" + fmtEta(eta) + ".root";
+    string label = meBinLabel(mass_min, mass_max, eta);
+
+    // New fitter for every bin: the workspace pdf names must not clash.
+    // (isValid() refers to the OS/LS files only, so it is not used here.)
+    InvariantMassFitter fitter;
+
+    fitter.setMassRange(mass_min, mass_max, mass_min, mass_max);
+    fitter.setFittingFunctions(cfg["fit_functions"]["signal"].get<string>(),
+                               bkgFunction,
+                               cfg["fit_functions"]["reflection"].get<string>());
+
+    const bool useEff  = me.value("use_efficiency", false);
+    const bool useRefl = me.value("reflections", false);
+    string mode_tag;
+
+    if (useEff) {
+        mode_tag += "_corrected";
+        if (!fitter.loadEfficiencyMap(me["efficiency_map"]["file"].get<string>(),
+                                      me["efficiency_map"]["hist"].get<string>())) {
+            cerr << "  >> SKIPPING ME " << label << ": efficiency map not loaded" << endl;
+            return false;
+        }
+        if (me.contains("min_efficiency")) fitter.setMinEfficiency(me["min_efficiency"].get<double>());
+    }
+    if (useRefl) {
+        mode_tag += "_refl";
+        fitter.setReflOverSgn(me.value("refl_over_sgn", 0.15f));
+    }
+
+    if (!fitter.loadMEData(me_file, me.value("tree_name", string("pairs")))) {
+        cerr << "  >> SKIPPING ME " << label << ": could not load " << me_file << endl;
+        return false;
+    }
+
+    string output_file = output_dir + "/fit_results_me_" + bkgFunction + mode_tag + "_" + label + ".root";
+    string plot_prefit = plots_dir + "/prefit_results_me/prefit_results_me" + mode_tag + "_" + label;
+    cout << "  Output: " << output_file << endl;
+
+    fitter.setOutputFile(output_file);
+    fitter.performPrefitME(useRefl);
+    fitter.plotPrefitResultsME(plot_prefit);
+    fitter.saveMEResultsToFile();
+    return true;
+}
+
 // Returns false if the bin could not be processed (missing input, missing efficiency map, ...)
 bool runOneBin(const json& cfg, double mass_min, double mass_max,
                double pt_min, double pt_max, const string& mode) {
@@ -170,23 +242,36 @@ int runFitter(int argc, char** argv) {
 
     int nFailed = 0;
 
-    // Loop over all combinations
-    for (double mass_min : mass_mins) {
-        for (double mass_max : mass_maxs) {
-            if (mass_min >= mass_max) continue; // meaningless window
-            for (size_t i = 0; i + 1 < pt_bins.size(); i++) {
-                double pt_min = pt_bins[i];
-                double pt_max = pt_bins[i + 1];
+    // ---- OS/LS pair fits ----
+    if (cfg.value("run_pair_fits", true)) {
+        for (double mass_min : mass_mins) {
+            for (double mass_max : mass_maxs) {
+                if (mass_min >= mass_max) continue; // meaningless window
+                for (size_t i = 0; i + 1 < pt_bins.size(); i++) {
+                    double pt_min = pt_bins[i];
+                    double pt_max = pt_bins[i + 1];
 
-                cout << "\n>> mass [" << mass_min << ", " << mass_max << "]"
-                     << "  pairPt [" << pt_min << ", " << pt_max << "]" << endl;
+                    cout << "\n>> mass [" << mass_min << ", " << mass_max << "]"
+                         << "  pairPt [" << pt_min << ", " << pt_max << "]" << endl;
 
-                for (const char* mode : {"basic", "efficiency", "efficiency_hybrid", "reflections", "reflections_raw"}) {
-                    if (cfg["modes"].contains(mode) && cfg["modes"][mode]["enabled"]) {
-                        cout << "   [" << mode << "]" << endl;
-                        if (!runOneBin(cfg, mass_min, mass_max, pt_min, pt_max, mode)) nFailed++;
+                    for (const char* mode : {"basic", "efficiency", "efficiency_hybrid", "reflections", "reflections_raw"}) {
+                        if (cfg["modes"].contains(mode) && cfg["modes"][mode]["enabled"]) {
+                            cout << "   [" << mode << "]" << endl;
+                            if (!runOneBin(cfg, mass_min, mass_max, pt_min, pt_max, mode)) nFailed++;
+                        }
                     }
                 }
+            }
+        }
+    }
+
+    // ---- Mixed-event single-candidate fits ----
+    if (cfg.value("run_me_fit", false)) {
+        for (double mass_min : mass_mins) {
+            for (double mass_max : mass_maxs) {
+                if (mass_min >= mass_max) continue;
+                    cout << "\n>> [ME] mass [" << mass_min << ", " << mass_max << "]" << endl;
+                    if (!runOneBinME(cfg, mass_min, mass_max)) nFailed++;
             }
         }
     }

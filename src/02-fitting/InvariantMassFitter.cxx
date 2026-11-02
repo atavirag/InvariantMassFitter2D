@@ -163,6 +163,16 @@ InvariantMassFitter::InvariantMassFitter(const std::string& osFilename, const st
     std::cout << "  LS entries: " << _lsTree->GetEntries() << std::endl;
 }
 
+// ME-only constructor: same defaults as the OS/LS constructor, no input files
+InvariantMassFitter::InvariantMassFitter()
+    : _osTree(nullptr), _lsTree(nullptr), _valid(false),
+      _m1Min(1.7), _m1Max(2.1), _m2Min(1.7), _m2Max(2.1),
+      _ptMin(1.0), _ptMax(24.0), _reflOverSgn(0.2),
+      _efficiencyMap(nullptr), _outputRootFile("")
+{
+    _workspace = std::make_unique<RooWorkspace>("w", "Invariant Mass Fit Workspace");
+}
+
 InvariantMassFitter::~InvariantMassFitter() {
     // Smart pointers will handle cleanup
 }
@@ -193,6 +203,80 @@ bool InvariantMassFitter::loadEfficiencyMap(const std::string& filename, const s
     std::cout << "  Map dimensions: " << _efficiencyMap->GetNbinsX() << " x "
               << _efficiencyMap->GetNbinsY() << " bins" << std::endl;
     return true;
+}
+
+// Builds one single-candidate dataset per candidate (1 and 2) from the ME pair tree.
+// Call setMassRange / setPtRange (and loadEfficiencyMap if needed) BEFORE this.
+bool InvariantMassFitter::loadMEData(const std::string& meFilename, const std::string& treeName) {
+    _meFile.reset(TFile::Open(meFilename.c_str(), "READ"));
+    if (!_meFile || _meFile->IsZombie()) {
+        std::cerr << "Error: Cannot open ME file " << meFilename << std::endl;
+        return false;
+    }
+    _meTree = dynamic_cast<TTree*>(_meFile->Get(treeName.c_str()));
+    if (!_meTree) {
+        std::cerr << "Error: Cannot find tree '" << treeName << "' in " << meFilename << std::endl;
+        return false;
+    }
+    if (!_m1 || !_m2) createVariables();
+
+    const bool useEfficiency = weighted();
+    const bool needWeights   = (_efficiencyMap != nullptr);
+
+    auto build = [&](int k, RooRealVar& mVar, RooRealVar& ptVar, RooRealVar& yVar,
+                     double mMin, double mMax) -> std::unique_ptr<RooDataSet> {
+        const std::string sk = std::to_string(k);
+
+        RooArgSet varSet(mVar, ptVar, yVar);
+        RooRealVar weight("meWeight", "efficiency weight", 1., 0., 1e5);
+        std::unique_ptr<RooDataSet> data;
+        if (useEfficiency) {
+            varSet.add(weight);
+            data = std::make_unique<RooDataSet>(("meData" + sk).c_str(), ("ME cand " + sk).c_str(),
+                                                varSet, RooFit::WeightVar(weight));
+        } else {
+            data = std::make_unique<RooDataSet>(("meData" + sk).c_str(), ("ME cand " + sk).c_str(), varSet);
+        }
+
+        float m = 0, pt = 0, y = 0;
+        if (_meTree->SetBranchAddress(("m"  + sk).c_str(), &m)  < 0 ||
+            _meTree->SetBranchAddress(("pt" + sk).c_str(), &pt) < 0 ||
+            _meTree->SetBranchAddress(("y"  + sk).c_str(), &y)  < 0) {
+            std::cerr << "Error: branches m" << k << "/pt" << k << "/y" << k << " not found" << std::endl;
+            _meTree->ResetBranchAddresses();
+            return nullptr;
+        }
+
+        long nSkippedMass = 0, nSkippedEff = 0;
+        const Long64_t n = _meTree->GetEntries();
+        for (Long64_t i = 0; i < n; i++) {
+            _meTree->GetEntry(i);
+            if (pt < _ptMin || pt > _ptMax) continue;
+            if (m < mMin || m > mMax) { nSkippedMass++; continue; }
+
+            double w = 1.;
+            if (needWeights) {
+                w = calculateWeights(pt, y);          // 1/efficiency or -1
+                if (w < 0.) { nSkippedEff++; continue; }
+            }
+            mVar.setVal(m);
+            ptVar.setVal(pt);
+            yVar.setVal(y);
+            if (useEfficiency) { weight.setVal(w); data->add(varSet, w); }
+            else               { data->add(varSet); }
+        }
+        _meTree->ResetBranchAddresses();
+
+        std::cout << "Loaded " << data->numEntries() << " ME entries for candidate " << k
+                  << " (sum of weights = " << data->sumEntries() << ")" << std::endl;
+        if (nSkippedMass > 0) std::cout << "  Skipped " << nSkippedMass << " outside the mass window" << std::endl;
+        if (nSkippedEff  > 0) std::cout << "  Skipped " << nSkippedEff  << " outside the efficiency map" << std::endl;
+        return data;
+    };
+
+    _meData1 = build(1, *_m1, *_pt1, *_y1, _m1Min, _m1Max);
+    _meData2 = build(2, *_m2, *_pt2, *_y2, _m2Min, _m2Max);
+    return _meData1 && _meData2;
 }
 
 std::vector<std::string> InvariantMassFitter::signalShapeNames() const {
@@ -838,6 +922,70 @@ void InvariantMassFitter::plotPrefitResults(const std::string& outputPrefix) {
     std::cout << "Prefit plots saved to " << filename << std::endl;
 
     delete c;
+}
+
+void InvariantMassFitter::performPrefitME(bool useReflections) {
+    if (!_meData1 || !_meData2) {
+        std::cerr << "Error: no ME data. Call loadMEData() first." << std::endl;
+        return;
+    }
+    std::cout << "\n=== 1D prefit on mixed-event candidates ===" << std::endl;
+
+    _prefitResult_me_m1.reset(performPrefit1D(_meData1.get(), *_m1, "prefit_me_m1", useReflections));
+    _prefitResult_me_m2.reset(performPrefit1D(_meData2.get(), *_m2, "prefit_me_m2", useReflections));
+
+    // Keep the fitted parameters for the weight computation later
+    const std::pair<const char*, RooDataSet*> sets[2] = {{"m1", _meData1.get()}, {"m2", _meData2.get()}};
+    for (const auto& s : sets) {
+        const std::string tag = std::string("prefit_me_") + s.first;
+        if (RooAbsPdf* model = _workspace->pdf((tag + "_model").c_str())) {
+            RooArgSet* p = model->getParameters(*s.second);
+            _workspace->saveSnapshot(("meParams_" + std::string(s.first)).c_str(), *p);
+            delete p;
+        }
+        double mean, meanErr, sigma, sigmaErr;
+        if (getSignalMeanSigma(_workspace.get(), _sgnFuncOption, tag + "_sig", mean, meanErr, sigma, sigmaErr))
+            std::cout << "  " << s.first << ": mean = " << mean << " +- " << meanErr
+                      << ", sigma = " << sigma << " +- " << sigmaErr << std::endl;
+    }
+}
+
+void InvariantMassFitter::plotPrefitResultsME(const std::string& outputPrefix) {
+    TCanvas c("c_prefit_me", "ME prefit", 1600, 700);
+    c.Divide(2, 1);
+    const std::string sigSuf = sigPdfSuffix(_sgnFuncOption);
+    const std::string bkgSuf = bkgPdfSuffix(_bkgFuncOption);
+
+    struct Panel { int pad; bool ok; RooDataSet* data; RooRealVar* var; std::string tag, title; };
+    std::vector<Panel> panels = {
+        {1, (bool)_prefitResult_me_m1, _meData1.get(), _m1.get(), "prefit_me_m1", "ME m_{1} prefit"},
+        {2, (bool)_prefitResult_me_m2, _meData2.get(), _m2.get(), "prefit_me_m2", "ME m_{2} prefit"},
+    };
+    for (auto& p : panels) {
+        if (!p.ok || !p.data) continue;
+        c.cd(p.pad);
+        RooPlot* frame = p.var->frame(RooFit::Title(p.title.c_str()));
+        p.data->plotOn(frame, RooFit::DrawOption("pz"));
+        if (RooAbsPdf* model = _workspace->pdf((p.tag + "_model").c_str())) {
+            model->plotOn(frame);
+            model->plotOn(frame, RooFit::Components((p.tag + "_sig" + sigSuf).c_str()),
+                          RooFit::LineColor(kGreen + 2));
+            model->plotOn(frame, RooFit::Components((p.tag + "_bkg" + bkgSuf).c_str()),
+                          RooFit::LineColor(kRed), RooFit::LineStyle(kDashed));
+        }
+        frame->Draw();
+    }
+    c.SaveAs((outputPrefix + "_prefitME.pdf").c_str());
+    c.SaveAs((outputPrefix + "_prefitME.png").c_str());
+}
+
+void InvariantMassFitter::saveMEResultsToFile() {
+    if (_outputRootFile.empty()) {
+        std::cerr << "Error: no output file set (call setOutputFile first)" << std::endl;
+        return;
+    }
+    _workspace->writeToFile(_outputRootFile.c_str(), true);   // recreate
+    std::cout << "ME prefit workspace saved to " << _outputRootFile << std::endl;
 }
 
 void InvariantMassFitter::fit(const std::string& dataType) {
