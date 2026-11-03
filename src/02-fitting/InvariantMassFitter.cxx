@@ -27,6 +27,7 @@
 #include "TPaveText.h"
 #include "TTree.h"
 #include "TVectorD.h"
+#include "TMatrixD.h"
 
 // std
 #include <algorithm>
@@ -99,6 +100,16 @@ bool getSignalMeanSigma(RooWorkspace* ws, const TString& opt, const std::string&
         return true;
     }
     return false;
+}
+
+// First floating parameter whose name contains `key`, or nullptr
+static RooRealVar* findPar(const RooFitResult* res, const std::string& key) {
+    if (!res) return nullptr;
+    for (auto* a : res->floatParsFinal()) {
+        auto* v = dynamic_cast<RooRealVar*>(a);
+        if (v && std::string(v->GetName()).find(key) != std::string::npos) return v;
+    }
+    return nullptr;
 }
 
 // Suffixes appended by the create*Pdf functions to the pdf names
@@ -956,24 +967,66 @@ void InvariantMassFitter::plotPrefitResultsME(const std::string& outputPrefix) {
     const std::string sigSuf = sigPdfSuffix(_sgnFuncOption);
     const std::string bkgSuf = bkgPdfSuffix(_bkgFuncOption);
 
-    struct Panel { int pad; bool ok; RooDataSet* data; RooRealVar* var; std::string tag, title; };
+    struct Panel { int pad; bool ok; RooDataSet* data; RooRealVar* var; RooFitResult* res;
+                   std::string tag, title; };
     std::vector<Panel> panels = {
-        {1, (bool)_prefitResult_me_m1, _meData1.get(), _m1.get(), "prefit_me_m1", "ME m_{1} prefit"},
-        {2, (bool)_prefitResult_me_m2, _meData2.get(), _m2.get(), "prefit_me_m2", "ME m_{2} prefit"},
+        {1, (bool)_prefitResult_me_m1, _meData1.get(), _m1.get(), _prefitResult_me_m1.get(),
+         "prefit_me_m1", "ME m_{1} prefit"},
+        {2, (bool)_prefitResult_me_m2, _meData2.get(), _m2.get(), _prefitResult_me_m2.get(),
+         "prefit_me_m2", "ME m_{2} prefit"},
     };
+
     for (auto& p : panels) {
         if (!p.ok || !p.data) continue;
         c.cd(p.pad);
+        gPad->SetLeftMargin(0.14);
+
         RooPlot* frame = p.var->frame(RooFit::Title(p.title.c_str()));
-        p.data->plotOn(frame, RooFit::DrawOption("pz"));
+        p.data->plotOn(frame, RooFit::DrawOption("pz"), RooFit::Name("data"));
+
         if (RooAbsPdf* model = _workspace->pdf((p.tag + "_model").c_str())) {
-            model->plotOn(frame);
+            model->plotOn(frame, RooFit::Name("model"), RooFit::LineColor(kBlue + 1));
+            if (p.res)   // chi2/ndf of the curve against the data, using the number of floating parameters
+
             model->plotOn(frame, RooFit::Components((p.tag + "_sig" + sigSuf).c_str()),
-                          RooFit::LineColor(kGreen + 2));
+                          RooFit::Name("sig"), RooFit::DrawOption("F"), RooFit::LineWidth(2),
+                          RooFit::LineStyle(1), RooFit::FillColor(kGreen - 2), RooFit::LineColor(kGreen + 2));
             model->plotOn(frame, RooFit::Components((p.tag + "_bkg" + bkgSuf).c_str()),
-                          RooFit::LineColor(kRed), RooFit::LineStyle(kDashed));
+                          RooFit::Name("bkg"), RooFit::LineColor(kRed), RooFit::LineStyle(kDashed));
+            if (auto* fill = frame->getAttFill("sig"))
+                fill->SetFillColorAlpha(kGreen - 2, 0.4);
+            model->plotOn(frame, RooFit::Components((p.tag + "_sig" + sigSuf).c_str()),
+                          RooFit::Name("sigLine"), RooFit::LineColor(kGreen + 2),
+                          RooFit::LineWidth(2), RooFit::LineStyle(1));
         }
+        frame->GetYaxis()->SetTitleOffset(1.5);
         frame->Draw();
+
+        // Legend (top left, away from the parameter box)
+        TLegend* leg = new TLegend(0.17, 0.68, 0.45, 0.88);
+        leg->SetBorderSize(0);
+        leg->SetFillStyle(0);
+        leg->SetTextSize(0.035);
+        if (frame->findObject("data"))  leg->AddEntry(frame->findObject("data"),  "ME data", "pe");
+        if (frame->findObject("model")) leg->AddEntry(frame->findObject("model"), "Total fit", "l");
+        if (frame->findObject("sig"))   leg->AddEntry(frame->findObject("sig"),   "Signal", "f");
+        if (frame->findObject("bkg"))   leg->AddEntry(frame->findObject("bkg"),   "Background", "l");
+        leg->Draw();
+
+        // Fit results box
+        auto* pave = new TPaveText(0.58, 0.62, 0.94, 0.88, "NDC");
+        pave->SetBorderSize(0);
+        pave->SetFillStyle(0);
+        pave->SetTextAlign(12);     // left, vertically centered
+        pave->SetTextFont(42);
+        pave->SetTextSize(0.035);
+        if (auto* v = findPar(p.res, p.tag + "_sig_mean"))
+            pave->AddText(Form("#mu = %.5f #pm %.5f GeV/#it{c}^{2}", v->getVal(), v->getError()));
+        if (auto* v = findPar(p.res, p.tag + "_sig_sigma"))
+            pave->AddText(Form("#sigma = %.5f #pm %.5f GeV/#it{c}^{2}", v->getVal(), v->getError()));
+        if (auto* v = findPar(p.res, p.tag + "_nSig"))
+            pave->AddText(Form("N_{sig} = %.0f #pm %.0f", v->getVal(), v->getError()));
+        pave->Draw();
     }
     c.SaveAs((outputPrefix + "_prefitME.pdf").c_str());
     c.SaveAs((outputPrefix + "_prefitME.png").c_str());
@@ -1284,6 +1337,9 @@ void InvariantMassFitter::plotModelOnFrame(RooPlot* frame, RooAbsPdf* pdf, bool 
     pdf->plotOn(frame, Components("pdfSigBkg"), LineStyle(3), LineWidth(2), LineColor(kOrange + 6), Name("sgnBkgFunc2D_curve"));
     pdf->plotOn(frame, Components("pdfBkgSig"), LineStyle(4), LineWidth(2), LineColor(kOrange), Name("bkgSgnFunc2D_curve"));
     pdf->plotOn(frame, DrawOption("F"), Components("pdfSigSig"), LineWidth(2), LineStyle(1), LineColor(kGreen + 2), FillColor(kGreen - 2), Name("sgnSgnFunc2D_curve"));
+    if (auto* fill = frame->getAttFill("sgnSgnFunc2D_curve"))
+        fill->SetFillColorAlpha(kGreen - 2, 0.4);
+    pdf->plotOn(frame, RooFit::Components("pdfSigSig"), RooFit::Name("sigsigLine"), RooFit::LineColor(kGreen + 2), RooFit::LineWidth(2), RooFit::LineStyle(1));
 
     if (doReflections) {
         pdf->plotOn(frame, Components("pdfBkgRefl"), LineWidth(2), LineStyle(2), LineColor(kViolet), Name("bkgReflFunc2D_curve"));

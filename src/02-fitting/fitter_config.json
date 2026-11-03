@@ -1,12 +1,12 @@
 {
-  "_input_dir": "~/analysis/double-D/InvariantMassFitter2D/data/data_2026_full",
-  "_output_dir": "~/analysis/double-D/InvariantMassFitter2D/data/data_2026_full",
-  "input_dir":  "~/analysis/double-D/InvariantMassFitter2D/data/mixed_event_2026_MB",
-  "output_dir": "~/analysis/double-D/InvariantMassFitter2D/data/mixed_event_2026_MB",
-  "plots_dir":  "~/analysis/double-D/InvariantMassFitter2D/plots/2026_pp",
+  "input_dir": "~/analysis/double-D/InvariantMassFitter2D/data/data_2024_full",
+  "output_dir": "~/analysis/double-D/InvariantMassFitter2D/data/data_2024_full",
+  "_input_dir":  "~/analysis/double-D/InvariantMassFitter2D/data/mixed_event_2026_MB",
+  "_output_dir": "~/analysis/double-D/InvariantMassFitter2D/data/mixed_event_2026_MB",
+  "plots_dir":  "~/analysis/double-D/InvariantMassFitter2D/plots/2024_pp",
 
-  "run_pair_fits": false,
-  "run_me_fit": true,
+  "run_pair_fits": true,
+  "run_me_fit": false,
 
   "set_LS_shape_from_OS": true,
   "eta": 0.7,
@@ -33,7 +33,8 @@
       "shape_from_basic": false,
       "min_efficiency": 0.00001,
       "efficiency_map": {
-        "file": "~/analysis/double-D/InvariantMassFitter2D/data/efficiencies/Eff_times_Acc_Map_weighted_g5.root",
+        "_file": "~/analysis/double-D/InvariantMassFitter2D/data/efficiencies/Eff_times_Acc_Map_weighted_g5.root",
+        "file": "~/analysis/double-D/InvariantMassFitter2D/data/efficiencies/Eff_times_Acc_Map_weighted_k3.root",
         "hist": "hEfficiencyMap"
       }
     },
@@ -43,7 +44,8 @@
       "shape_from_basic": false,
       "min_efficiency": 0.00001,
       "efficiency_map": {
-        "file": "~/analysis/double-D/InvariantMassFitter2D/data/efficiencies/Eff_times_Acc_Map_weighted_g5.root",
+        "_file": "~/analysis/double-D/InvariantMassFitter2D/data/efficiencies/Eff_times_Acc_Map_weighted_g5.root",
+        "file": "~/analysis/double-D/InvariantMassFitter2D/data/efficiencies/Eff_times_Acc_Map_weighted_k3.root",
         "hist": "hEfficiencyMap"
       }
     },
@@ -54,7 +56,8 @@
     "efficiency_hybrid": {
       "enabled": true,
       "efficiency_map": {
-        "file": "~/analysis/double-D/InvariantMassFitter2D/data/efficiencies/Eff_times_Acc_Map_weighted_g5.root",
+        "_file": "~/analysis/double-D/InvariantMassFitter2D/data/efficiencies/Eff_times_Acc_Map_weighted_g5.root",
+        "file": "~/analysis/double-D/InvariantMassFitter2D/data/efficiencies/Eff_times_Acc_Map_weighted_k3.root",
         "hist": "hEfficiencyMap"
       }
     }
